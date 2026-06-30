@@ -1,0 +1,211 @@
+:root {
+    --primary-color: #0d6efd;
+    --success-color: #198754;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --info-color: #0dcaf0;
+    --light-color: #f8f9fa;
+    --dark-color: #212529;
+}
+
+body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.card {
+    border: none;
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.card-header {
+    border-radius: 15px 15px 0 0 !important;
+    border-bottom: none;
+    padding: 1.5rem;
+}
+
+.status-item {
+    padding: 1rem;
+    transition: transform 0.2s ease;
+}
+
+.status-item:hover {
+    transform: translateY(-2px);
+}
+
+.status-item i {
+    transition: color 0.3s ease;
+}
+
+.btn {
+    border-radius: 10px;
+    font-weight: 500;
+    padding: 0.6rem 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.form-control {
+    border-radius: 10px;
+    border: 1px solid #dee2e6;
+    padding: 0.75rem 1rem;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    transform: translateY(-1px);
+}
+
+.input-group .form-control {
+    border-radius: 10px 0 0 10px;
+}
+
+.input-group .btn {
+    border-radius: 0 10px 10px 0;
+}
+
+.alert {
+    border-radius: 10px;
+    border: none;
+    padding: 1rem 1.5rem;
+}
+
+.modal-content {
+    border-radius: 15px;
+    border: none;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+    border-radius: 15px 15px 0 0;
+}
+
+.modal-footer {
+    border-top: 1px solid rgba(0,0,0,0.1);
+    border-radius: 0 0 15px 15px;
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-out;
+}
+
+/* 状态指示器 */
+.status-online {
+    color: var(--success-color);
+}
+
+.status-offline {
+    color: var(--danger-color);
+}
+
+.status-loading {
+    color: var(--warning-color);
+}
+
+/* 日志样式 */
+.log-item {
+    padding: 1rem;
+    border-radius: 10px;
+    border: 1px solid #e9ecef;
+    margin-bottom: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.log-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-color: var(--primary-color);
+}
+
+.log-success {
+    border-left: 4px solid var(--success-color);
+}
+
+.log-failure {
+    border-left: 4px solid var(--danger-color);
+}
+
+.log-test {
+    border-left: 4px solid var(--warning-color);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .container {
+        padding: 0 0.5rem;
+    }
+    
+    .card {
+        margin: 0.5rem 0;
+    }
+    
+    .d-md-flex .btn {
+        margin-bottom: 0.5rem;
+    }
+    
+    .status-item {
+        padding: 0.5rem;
+        margin-bottom: 1rem;
+    }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+    .card {
+        background: rgba(33, 37, 41, 0.95);
+        color: #fff;
+    }
+    
+    .form-control {
+        background-color: #495057;
+        border-color: #6c757d;
+        color: #fff;
+    }
+    
+    .form-control:focus {
+        background-color: #495057;
+        border-color: var(--primary-color);
+        color: #fff;
+    }
+}
+
+/* 加载动画 */
+.spinner-border {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 成功/失败状态 */
+.result-success {
+    border: 2px solid var(--success-color);
+    background: rgba(25, 135, 84, 0.1);
+}
+
+.result-failure {
+    border: 2px solid var(--danger-color);
+    background: rgba(220, 53, 69, 0.1);
+}
+
+.result-test {
+    border: 2px solid var(--warning-color);
+    background: rgba(255, 193, 7, 0.1);
+}
