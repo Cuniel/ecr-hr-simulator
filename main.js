@@ -19,17 +19,20 @@ class AutoClockInApp {
   async run(options = {}) {
     const { headless = false, dryRun = false } = options;
     
+    Utils.resetTrace();
     this.results.startTime = new Date().toISOString();
     
     try {
-      Utils.log('info', '🚀 启动自动打卡应用...');
+      Utils.log('info', '🚀 启动自动操作应用...');
       Utils.log('info', `📱 运行模式: ${headless ? '无头模式' : '可见模式'}`);
       Utils.log('info', `🧪 测试模式: ${dryRun ? '启用' : '关闭'}`);
+      Utils.log('info', `👤 登录用户: ${Utils.maskUsername(this.config.username)}`);
+      Utils.log('info', `🔑 密码状态: ${this.config.password ? `已提供 (${String(this.config.password).length} 位)` : '未提供'}`);
       
       // 设置 DRY RUN 模式
       if (dryRun) {
         this.config.dryRun = true;
-        Utils.log('info', '🚫 DRY RUN 模式已启用 - 不会实际打卡');
+        Utils.log('info', '🚫 DRY RUN 模式已启用 - 不会实际操作');
       }
 
       // 初始化浏览器
@@ -37,7 +40,7 @@ class AutoClockInApp {
 
       // 执行登录
       Utils.log('info', '🔐 开始登录阶段...');
-      const login = new Login(page);
+      const login = new Login(page, this.config);
       const loginSuccess = await login.perform();
       
       this.results.login = loginSuccess;
@@ -48,28 +51,28 @@ class AutoClockInApp {
         return false;
       }
 
-      // 执行打卡
-      Utils.log('info', '⏰ 开始打卡阶段...');
-      const clockIn = new ClockIn(page);
+      // 执行操作
+      Utils.log('info', '⏰ 开始操作阶段...');
+      const clockIn = new ClockIn(page, this.config);
       const clockInSuccess = await clockIn.perform();
 
       this.results.clockin = clockInSuccess;
 
       if (clockInSuccess) {
-        Utils.log('success', '🎉 自动打卡流程完成！');
+        Utils.log('success', '🎉 自动操作流程完成！');
         
         // 无头模式下输出详细结果
         if (headless) {
           Utils.log('info', '📊 执行结果汇总:');
           Utils.log('success', `  ✅ 登录: ${loginSuccess ? '成功' : '失败'}`);
-          Utils.log('success', `  ✅ 打卡: ${clockInSuccess ? '成功' : '失败'}`);
+          Utils.log('success', `  ✅ 操作: ${clockInSuccess ? '成功' : '失败'}`);
           Utils.log('info', `  📁 日志文件保存在: ./logs/`);
         }
         
         return true;
       } else {
-        Utils.log('error', '打卡失败');
-        this.results.errors.push('打卡失败');
+        Utils.log('error', '操作失败');
+        this.results.errors.push('操作失败');
         return false;
       }
 
@@ -81,7 +84,7 @@ class AutoClockInApp {
       this.results.endTime = new Date().toISOString();
       
       // 生成执行报告（特别适用于无头模式）
-      await Utils.createReport(this.results);
+      await Utils.createReport(this.results, { dryRun, headless, config: this.config });
       
       // 清理资源
       await this.cleanup();

@@ -13,7 +13,7 @@ class WebServer {
   constructor() {
     this.app = express();
     this.port = process.env.PORT || 3000;
-    this.setupSecurity();
+    //this.setupSecurity();
     this.setupMiddleware();
     this.setupRoutes();
     this.setupErrorHandling();
@@ -25,8 +25,9 @@ class WebServer {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-          scriptSrc: ["'self'", "'unsafe-inline'"],
+          styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+          scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+          fontSrc: ["'self'", "https://cdnjs.cloudflare.com", "data:"],
           imgSrc: ["'self'", "data:", "https:"],
           connectSrc: ["'self'"]
         }
@@ -44,7 +45,7 @@ class WebServer {
     // 速率限制
     const rateLimiter = new RateLimiterMemory({
       keyName: 'ip',
-      points: 10, // 10 次请求
+      points: 100, // 10 次请求
       duration: 60, // 每分钟
     });
 
@@ -184,7 +185,7 @@ class WebServer {
       });
 
       this.app.listen(this.port, '0.0.0.0', () => {
-        console.log(`🚀 打卡服务已启动！`);
+        console.log(`🚀 ECR 工作台服务已启动！`);
         console.log(`📱 Web界面: http://localhost:${this.port}`);
         console.log(`🔗 API文档: http://localhost:${this.port}/api/docs`);
         console.log(`💓 健康检查: http://localhost:${this.port}/health`);

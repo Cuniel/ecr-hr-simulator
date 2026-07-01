@@ -1,3 +1,17 @@
 .DS_Store
 node_modules/
 chrome-profile/
+
+# Runtime output
+logs/
+*.log
+
+# Local environment overrides
+.env
+.env.*
+!.env.example
+
+# Test/build artifacts
+coverage/
+dist/
+build/

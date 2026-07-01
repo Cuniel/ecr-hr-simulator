@@ -1,9 +1,8 @@
-version: '3.8'
 services:
-  daka-simulator:
+  ecr-hr-simulator:
     build: 
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile
     ports:
       - "3000:3000"
     environment:
@@ -13,11 +12,13 @@ services:
       # Playwright 优化
       - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
       - PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
+      - CHROME_BIN=/usr/bin/chromium-browser
+      - CHROME_PATH=/usr/bin/chromium-browser
       # 内存限制
       - NODE_OPTIONS=--max-old-space-size=2048
     volumes:
-      - ./logs:/app/logs
-      - ./temp:/app/temp
+      - ../logs:/app/logs
+      - ../temp:/app/temp
     restart: unless-stopped
     # 资源限制
     deploy:

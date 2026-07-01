@@ -1,4 +1,5 @@
 const { chromium } = require('playwright');
+const fs = require('fs');
 const Utils = require('./utils');
 
 class BrowserManager {
@@ -10,10 +11,23 @@ class BrowserManager {
 
   async init(headless = false) {
     Utils.log('info', `🚀 启动浏览器 (${headless ? '无头模式' : '可见模式'})...`);
-    
+
+    const executablePath = this.getChromiumExecutablePath();
+    if (executablePath) {
+      Utils.log('info', `🌐 使用 Chromium: ${executablePath}`);
+    }
+
     this.browser = await chromium.launch({
       headless: headless,
-      slowMo: headless ? 0 : 200
+      slowMo: headless ? 0 : 200,
+      executablePath,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-features=site-per-process'
+      ]
     });
 
     const context = await this.browser.newContext({
@@ -35,15 +49,26 @@ class BrowserManager {
     // 监听请求
     this.page.on('request', request => {
       if (request.url().includes('check4CheckBtn')) {
-        Utils.log('warning', '🚨 检测到打卡请求:', request.url());
+        Utils.log('warning', '🚨 检测到操作请求:', request.url());
       }
     });
 
-    // 监听控制台日志（可选）
-    this.page.on('console', msg => {
-      if (msg.type() === 'error') {
-        Utils.log('debug', '浏览器错误:', msg.text());
+    // 监听浏览器控制台日志，统一写入执行 trace
+    this.page.on('console', async msg => {
+      const level = msg.type() === 'error' ? 'error' : msg.type() === 'warning' ? 'warning' : 'debug';
+      const values = [];
+      for (const arg of msg.args()) {
+        try {
+          values.push(await arg.jsonValue());
+        } catch {
+          values.push(String(arg));
+        }
       }
+      Utils.log(level, `浏览器Console[${msg.type()}]: ${msg.text()}`, ...values);
+    });
+
+    this.page.on('pageerror', error => {
+      Utils.log('error', '浏览器页面异常:', error);
     });
 
     Utils.log('success', '浏览器初始化完成');
@@ -59,6 +84,18 @@ class BrowserManager {
 
   getPage() {
     return this.page;
+  }
+
+  getChromiumExecutablePath() {
+    const candidates = [
+      process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+      process.env.CHROME_BIN,
+      process.env.CHROME_PATH,
+      '/usr/bin/chromium-browser',
+      '/usr/bin/chromium'
+    ].filter(Boolean);
+
+    return candidates.find(candidate => fs.existsSync(candidate));
   }
 }
 

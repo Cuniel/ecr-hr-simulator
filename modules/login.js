@@ -2,9 +2,9 @@ const Utils = require('./utils');
 const SlideVerify = require('./slideVerify');
 
 class Login {
-  constructor(page) {
+  constructor(page, config = Utils.loadConfig()) {
     this.page = page;
-    this.config = Utils.loadConfig();
+    this.config = config;
     this.slideVerify = new SlideVerify(page);
   }
 

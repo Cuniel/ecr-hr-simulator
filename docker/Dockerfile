@@ -25,11 +25,8 @@ RUN apk add --no-cache \
 
 # 设置 Playwright/Chromium 环境变量
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
     PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser \
-    PLAYWRIGHT_BROWSERS_PATH=/usr/bin \
-    # Chromium 运行参数
     CHROME_BIN=/usr/bin/chromium-browser \
     CHROME_PATH=/usr/bin/chromium-browser \
     # 无头模式优化
@@ -41,25 +38,25 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 # 复制 package 文件
 COPY package*.json ./
 
-# 安装依赖 (使用与本地相同的 Node.js 版本)
-RUN npm ci --only=production --no-audit --no-fund
+# 安装依赖。浏览器使用 Alpine 系统 Chromium，不下载 Playwright 内置浏览器。
+RUN npm ci --omit=dev --no-audit --no-fund
 
 # 复制应用代码
 COPY . .
 
 # 创建必要目录
-RUN mkdir -p logs web/public temp
+RUN mkdir -p logs web/public temp screenshots reports
 
 # 创建非 root 用户 (安全考虑)
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S daka -u 1001 -G nodejs
+    adduser -S ecr-hr -u 1001 -G nodejs
 
 # 设置目录权限
-RUN chown -R daka:nodejs /app && \
+RUN chown -R ecr-hr:nodejs /app && \
     chmod -R 755 /app
 
 # 切换到非 root 用户
-USER daka
+USER ecr-hr
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

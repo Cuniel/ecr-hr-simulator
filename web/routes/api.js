@@ -1,6 +1,6 @@
 const express = require('express');
 const AutoClockInApp = require('../../main');
-const Utils = require('../../modules/utils');
+const ChineseCalendar = require('../../modules/chineseCalendar');
 const fs = require('fs');
 const path = require('path');
 
@@ -9,17 +9,36 @@ const router = express.Router();
 // API 文档
 router.get('/docs', (req, res) => {
   res.json({
-    name: 'DaKa Simulator API',
+    name: 'ECR HR Simulator API',
     version: '2.0.0',
     endpoints: {
-      'POST /api/clockin': '执行打卡',
-      'POST /api/test': '测试打卡 (DRY RUN)',
+      'POST /api/clockin': '执行操作',
+      'POST /api/test': '测试操作 (DRY RUN)',
       'GET /api/status': '获取系统状态',
+      'GET /api/calendar/today': '获取今日工作日状态',
       'GET /api/logs': '获取执行日志',
-      'GET /api/logs/:limit': '获取指定数量的执行日志',
-      'POST /api/validate': '验证账号信息'
+      'GET /api/logs/:limit': '获取指定数量的执行日志'
     }
   });
+});
+
+// 今日工作日状态
+router.get('/calendar/today', (req, res) => {
+  try {
+    const date = req.query.date || ChineseCalendar.formatDate(new Date());
+    const calendar = ChineseCalendar.getDayType(date);
+
+    res.json({
+      success: true,
+      data: calendar,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
 });
 
 // 系统状态
@@ -81,7 +100,7 @@ router.post('/validate', async (req, res) => {
   }
 });
 
-// 测试打卡 (DRY RUN)
+// 测试操作 (DRY RUN)
 router.post('/test', async (req, res) => {
   try {
     const { username, password, location } = req.body;
@@ -93,28 +112,11 @@ router.post('/test', async (req, res) => {
       });
     }
 
-    // 创建临时配置
-    const tempConfig = {
-      username,
-      password,
-      location: location || { latitude: 31.24, longitude: 121.42 },
-      dryRun: true
-    };
-
-    // 保存临时配置
-    const tempConfigPath = path.join(__dirname, '../../temp-config.json');
-    fs.writeFileSync(tempConfigPath, JSON.stringify(tempConfig, null, 2));
-
     // 执行测试
     const app = new AutoClockInApp();
-    app.config = tempConfig; // 使用临时配置
+    app.config = buildRunConfig({ username, password, location, dryRun: true });
     
     const result = await app.run({ headless: true, dryRun: true });
-
-    // 清理临时配置
-    if (fs.existsSync(tempConfigPath)) {
-      fs.unlinkSync(tempConfigPath);
-    }
 
     // 获取最新的执行报告
     const latestReport = getLatestReport();
@@ -127,7 +129,7 @@ router.post('/test', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('测试打卡错误:', error);
+    console.error('测试操作错误:', error);
     res.status(500).json({
       success: false,
       message: '测试过程发生错误: ' + error.message
@@ -135,7 +137,7 @@ router.post('/test', async (req, res) => {
   }
 });
 
-// 执行真实打卡
+// 执行真实操作
 router.post('/clockin', async (req, res) => {
   try {
     const { username, password, location, confirm } = req.body;
@@ -150,48 +152,31 @@ router.post('/clockin', async (req, res) => {
     if (!confirm) {
       return res.status(400).json({
         success: false,
-        message: '请确认执行真实打卡操作'
+        message: '请确认执行真实操作操作'
       });
     }
 
-    // 创建临时配置
-    const tempConfig = {
-      username,
-      password,
-      location: location || { latitude: 31.24, longitude: 121.42 },
-      dryRun: false
-    };
-
-    // 保存临时配置
-    const tempConfigPath = path.join(__dirname, '../../temp-config.json');
-    fs.writeFileSync(tempConfigPath, JSON.stringify(tempConfig, null, 2));
-
-    // 执行真实打卡
+    // 执行真实操作
     const app = new AutoClockInApp();
-    app.config = tempConfig; // 使用临时配置
+    app.config = buildRunConfig({ username, password, location, dryRun: false });
     
     const result = await app.run({ headless: true, dryRun: false });
-
-    // 清理临时配置
-    if (fs.existsSync(tempConfigPath)) {
-      fs.unlinkSync(tempConfigPath);
-    }
 
     // 获取最新的执行报告
     const latestReport = getLatestReport();
 
     res.json({
       success: result,
-      message: result ? '🎉 打卡成功！' : '❌ 打卡失败，请查看详细日志',
+      message: result ? '🎉 操作成功！' : '❌ 操作失败，请查看详细日志',
       data: latestReport,
       timestamp: new Date().toISOString()
     });
 
   } catch (error) {
-    console.error('执行打卡错误:', error);
+    console.error('执行操作错误:', error);
     res.status(500).json({
       success: false,
-      message: '打卡过程发生错误: ' + error.message
+      message: '操作过程发生错误: ' + error.message
     });
   }
 });
@@ -230,6 +215,7 @@ function handleLogsRequest(req, res, limit) {
             success: content.success,
             mode: content.mode,
             dryRun: content.dryRun,
+            account: content.account,
             results: content.results,
             size: stats.size,
             modified: stats.mtime.toISOString()
@@ -252,6 +238,15 @@ function handleLogsRequest(req, res, limit) {
       message: '获取日志失败: ' + error.message 
     });
   }
+}
+
+function buildRunConfig({ username, password, location, dryRun }) {
+  return {
+    username,
+    password,
+    location: location || { latitude: 31.24, longitude: 121.42 },
+    dryRun
+  };
 }
 
 // 获取最新报告的辅助函数
