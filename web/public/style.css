@@ -76,7 +76,10 @@ body {
 
 /* 时间显示面板 */
 .time-panel {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-strong) 100%);
+    padding: 14px;
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 36%),
+        linear-gradient(135deg, var(--primary) 0%, var(--primary-strong) 100%);
     color: white;
     border: none;
     position: relative;
@@ -86,37 +89,49 @@ body {
 .time-panel::before {
     content: '';
     position: absolute;
-    top: -50%;
-    right: -50%;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+    inset: 0;
+    background:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask-image: linear-gradient(110deg, transparent 0%, #000 18%, #000 72%, transparent 100%);
     pointer-events: none;
 }
 
 .time-display {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 16px;
+    display: grid;
+    grid-template-columns: minmax(190px, 1.05fr) minmax(330px, 1.2fr) minmax(180px, 0.85fr);
+    gap: 10px;
+    align-items: center;
     position: relative;
     z-index: 1;
 }
 
 .time-main {
-    flex: 1;
+    min-width: 0;
+    min-height: 62px;
+    padding: 10px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    text-align: center;
 }
 
 .time-label {
     display: block;
-    font-size: 0.85rem;
-    opacity: 0.8;
-    margin-bottom: 4px;
-    font-weight: 500;
+    width: max-content;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.13);
+    font-size: 0.75rem;
+    opacity: 0.86;
+    margin: 0 auto 8px;
+    font-weight: 800;
 }
 
 .time-value {
-    font-size: 2.5rem;
+    font-size: 1.82rem;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     line-height: 1;
@@ -124,20 +139,33 @@ body {
 }
 
 .time-info {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    text-align: right;
-    opacity: 0.9;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    text-align: center;
+    opacity: 1;
 }
 
 .time-detail {
-    font-size: 0.9rem;
+    min-height: 62px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    font-size: 0.88rem;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: flex-end;
-    gap: 4px;
+    justify-content: center;
+    gap: 8px;
     transition: color 0.2s ease;
+    white-space: nowrap;
+}
+
+.time-detail i {
+    margin-right: 0 !important;
+    opacity: 0.78;
 }
 
 .time-detail.is-workday {
@@ -151,7 +179,13 @@ body {
 .status-indicator {
     display: flex;
     align-items: center;
-    gap: 8px;
+    justify-content: center;
+    gap: 9px;
+    min-height: 62px;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 10px;
+    background: rgba(10, 28, 24, 0.22);
     position: relative;
     z-index: 1;
 }
@@ -176,9 +210,10 @@ body {
 }
 
 .status-text {
-    font-size: 0.9rem;
-    font-weight: 500;
-    opacity: 0.9;
+    font-size: 0.92rem;
+    font-weight: 800;
+    opacity: 0.94;
+    text-align: center;
 }
 
 @keyframes pulse {
@@ -249,6 +284,44 @@ body {
     min-width: 92px;
 }
 
+.credentials-card {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: rgba(251, 246, 237, 0.78);
+    overflow: hidden;
+}
+
+.credentials-toggle {
+    width: 100%;
+    min-height: 48px;
+    padding: 12px 14px;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 800;
+}
+
+.credentials-toggle span {
+    min-width: 0;
+}
+
+.credentials-toggle i:last-child {
+    color: var(--muted);
+}
+
+.credentials-body {
+    display: grid;
+    gap: 18px;
+    padding: 0 14px 16px;
+}
+
+.credentials-card.is-collapsed .credentials-toggle {
+    background: rgba(39, 95, 85, 0.05);
+}
+
 .remember-row {
     display: inline-flex;
     gap: 8px;
@@ -276,13 +349,11 @@ body {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
+    margin-top: 12px;
 }
 
-.location-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px 18px;
-    align-items: center;
+.custom-location-fields[hidden] {
+    display: none !important;
 }
 
 .btn {
@@ -533,41 +604,44 @@ body {
     background: linear-gradient(135deg, rgba(217, 139, 53, 0.02) 0%, rgba(217, 139, 53, 0.08) 100%);
 }
 
-.result-summary {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    margin-bottom: 16px;
-}
-
-.result-summary i {
-    color: var(--primary);
-    font-size: 1.8rem;
-}
-
-.metric-grid {
+.result-meta-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
-    margin-top: 14px;
 }
 
-.metric-card {
-    min-height: 88px;
-    padding: 14px;
+.result-meta-item {
+    min-height: 72px;
+    padding: 12px 14px;
     border: 1px solid var(--line);
     border-radius: 8px;
-    background: #fbf6ed;
+    background: rgba(255, 250, 241, 0.72);
     display: flex;
     flex-direction: column;
-    align-items: center;
     justify-content: center;
-    text-align: center;
+    gap: 4px;
 }
 
-.metric-card i {
-    font-size: 1.5rem;
-    margin-bottom: 8px;
+.result-meta-item span {
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.result-meta-item strong {
+    color: var(--ink);
+    font-size: 0.96rem;
+    line-height: 1.25;
+}
+
+.result-meta-item.is-success {
+    border-color: rgba(47, 122, 73, 0.24);
+    background: rgba(47, 122, 73, 0.08);
+}
+
+.result-meta-item.is-failure {
+    border-color: rgba(185, 65, 52, 0.24);
+    background: rgba(185, 65, 52, 0.08);
 }
 
 .screenshot-preview {
@@ -686,7 +760,7 @@ body {
 }
 
 .fade-in {
-    animation: fadeIn 0.4s ease-out;
+    animation: none;
 }
 
 /* 焦点样式 */
@@ -711,13 +785,17 @@ body {
     }
 
     .time-display {
-        flex-direction: column;
-        gap: 16px;
+        grid-template-columns: 1fr;
     }
 
     .time-info {
-        align-items: flex-start;
-        text-align: left;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 961px) {
+    .time-info {
+        min-width: 280px;
     }
 }
 
@@ -748,12 +826,12 @@ body {
     }
 
     .time-value {
-        font-size: 2rem;
+        font-size: 1.3rem;
     }
 
     .coordinate-grid,
     .account-manager,
-    .metric-grid {
+    .result-meta-grid {
         grid-template-columns: 1fr;
     }
 
@@ -763,15 +841,69 @@ body {
     }
 
     .time-display {
-        gap: 12px;
+        grid-template-columns: minmax(112px, 1fr) auto auto;
+        gap: 6px;
     }
 
     .time-info {
+        display: flex;
         gap: 6px;
+    }
+
+    .time-detail {
+        min-height: 42px;
+        padding: 6px 8px;
+        font-size: 0.72rem;
+    }
+
+    .status-indicator,
+    .time-main {
+        min-height: 42px;
+    }
+
+    .time-main {
+        padding: 7px 8px;
+    }
+
+    .time-label,
+    .time-detail i,
+    .status-text {
+        display: none;
+    }
+
+    .status-indicator {
+        width: 42px;
+        padding: 0;
+    }
+
+    .status-dot {
+        width: 10px;
+        height: 10px;
     }
 
     .modal-body {
         padding: 20px;
+    }
+}
+
+@media (max-width: 420px) {
+    .time-panel {
+        padding: 10px;
+    }
+
+    .time-value {
+        font-size: 1.18rem;
+    }
+}
+
+@media (max-width: 340px) {
+    .time-info {
+        gap: 4px;
+    }
+
+    .time-detail {
+        padding-inline: 6px;
+        font-size: 0.68rem;
     }
 }
 
@@ -835,7 +967,7 @@ body {
         background: linear-gradient(135deg, #2d5a4f 0%, #1a4039 100%);
     }
     
-    .metric-card {
+    .result-meta-item {
         background: #2a2a2a;
         border-color: var(--line);
     }

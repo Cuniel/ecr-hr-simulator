@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const util = require('util');
 
 class Utils {
   static trace = [];
@@ -12,7 +13,7 @@ class Utils {
       const configData = fs.readFileSync(configPath, 'utf8');
       return JSON.parse(configData);
     } catch (error) {
-      console.error('❌ 配置文件读取失败:', error);
+      Utils.writeConsole('error', '配置文件读取失败', error);
       process.exit(1);
     }
   }
@@ -26,29 +27,64 @@ class Utils {
   }
 
   static log(level, message, ...args) {
-    const timestamp = new Date().toLocaleString('zh-CN');
-    const prefix = {
-      'info': 'ℹ️ ',
-      'success': '✅',
-      'warning': '⚠️ ',
-      'error': '❌',
-      'debug': '🔍'
-    }[level] || 'ℹ️ ';
-    
-    // 在无头模式下提供更详细的日志
-    const isHeadless = process.argv.includes('--headless');
-    if (isHeadless) {
-      console.log(`[${timestamp}] ${prefix} ${message}`, ...args);
-    } else {
-      console.log(`${prefix} ${message}`, ...args);
-    }
+    const normalizedLevel = Utils.normalizeLogLevel(level);
+    const timestamp = new Date().toISOString();
+    const cleanMessage = Utils.cleanLogText(message);
+    const cleanArgs = args.map(arg => Utils.serializeTraceArg(arg));
+
+    Utils.writeConsole(normalizedLevel, cleanMessage, ...cleanArgs);
 
     Utils.trace.push({
-      timestamp: new Date().toISOString(),
-      level,
-      message: String(message),
-      args: args.map(arg => Utils.serializeTraceArg(arg))
+      timestamp,
+      level: normalizedLevel,
+      message: cleanMessage,
+      args: cleanArgs
     });
+  }
+
+  static normalizeLogLevel(level) {
+    const normalized = String(level || 'info').toLowerCase();
+    if (normalized === 'warn') return 'warning';
+    if (normalized === 'success') return 'info';
+    return ['debug', 'info', 'warning', 'error'].includes(normalized) ? normalized : 'info';
+  }
+
+  static writeConsole(level, message, ...args) {
+    const normalizedLevel = Utils.normalizeLogLevel(level);
+    if (!Utils.shouldPrintLog(normalizedLevel)) return;
+
+    const timestamp = new Date().toISOString();
+    const label = {
+      debug: 'DEBUG',
+      info: 'INFO',
+      warning: 'WARN',
+      error: 'ERROR'
+    }[normalizedLevel];
+    const formattedArgs = args
+      .filter(arg => arg !== undefined)
+      .map(arg => typeof arg === 'string' ? Utils.cleanLogText(arg) : util.inspect(arg, { depth: 4, colors: false, breakLength: 120 }));
+    const line = [timestamp, label, Utils.cleanLogText(message), ...formattedArgs].filter(Boolean).join(' ');
+
+    if (normalizedLevel === 'error') {
+      console.error(line);
+    } else if (normalizedLevel === 'warning') {
+      console.warn(line);
+    } else {
+      console.log(line);
+    }
+  }
+
+  static shouldPrintLog(level) {
+    const order = { debug: 10, info: 20, warning: 30, error: 40 };
+    const configured = Utils.normalizeLogLevel(process.env.LOG_LEVEL || 'info');
+    return order[level] >= order[configured];
+  }
+
+  static cleanLogText(value) {
+    return String(value ?? '')
+      .replace(/[\u{1F000}-\u{1FAFF}\u{203C}-\u{3299}\uFE0E\uFE0F\u200D]/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   static resetTrace() {
@@ -106,7 +142,7 @@ class Utils {
         Utils.logsDir = dir;
         return dir;
       } catch (error) {
-        console.warn(`⚠️ 日志目录不可写，尝试下一个: ${dir} (${error.message})`);
+        Utils.writeConsole('warning', `日志目录不可写，尝试下一个: ${dir} (${error.message})`);
       }
     }
 

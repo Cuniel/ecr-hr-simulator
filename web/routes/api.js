@@ -16,12 +16,32 @@ router.get('/docs', (req, res) => {
       'POST /api/clockin': '执行操作',
       'POST /api/test': '测试操作',
       'GET /api/status': '获取系统状态',
+      'GET /api/config': '获取前端配置',
       'GET /api/calendar/today': '获取今日工作日状态',
       'GET /api/screenshots/:filename': '查看执行截图',
       'GET /api/logs': '获取执行日志',
       'GET /api/logs/:limit': '获取指定数量的执行日志'
     }
   });
+});
+
+// 前端配置，不返回账号密码等敏感字段
+router.get('/config', (req, res) => {
+  try {
+    const config = Utils.loadConfig();
+    const locations = normalizeLocations(config);
+
+    res.json({
+      success: true,
+      data: {
+        locations,
+        defaultLocationId: locations.find(location => location.default)?.id || locations[0]?.id || 'custom'
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: '读取配置失败: ' + error.message });
+  }
 });
 
 // 今日工作日状态
@@ -131,7 +151,7 @@ router.post('/test', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('测试操作错误:', error);
+    Utils.writeConsole('error', '测试操作错误', error);
     res.status(500).json({
       success: false,
       message: '测试过程发生错误: ' + error.message
@@ -175,7 +195,7 @@ router.post('/clockin', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('执行操作错误:', error);
+    Utils.writeConsole('error', '执行操作错误', error);
     res.status(500).json({
       success: false,
       message: '操作过程发生错误: ' + error.message
@@ -249,7 +269,7 @@ function handleLogsRequest(req, res, limit) {
           };
         } catch (parseError) {
           // 如果文件解析失败，跳过该文件
-          console.error(`解析日志文件 ${file} 失败:`, parseError);
+          Utils.writeConsole('error', `解析日志文件 ${file} 失败`, parseError);
           return null;
         }
       })
@@ -259,7 +279,7 @@ function handleLogsRequest(req, res, limit) {
     
     res.json({ success: true, data: logFiles });
   } catch (error) {
-    console.error('获取日志失败:', error);
+    Utils.writeConsole('error', '获取日志失败', error);
     res.status(500).json({ 
       success: false, 
       message: '获取日志失败: ' + error.message 
@@ -271,9 +291,39 @@ function buildRunConfig({ username, password, location, dryRun }) {
   return {
     username,
     password,
-    location: location || { latitude: 31.24, longitude: 121.42 },
+    location: normalizeRunLocation(location),
     dryRun
   };
+}
+
+function normalizeRunLocation(location) {
+  return {
+    latitude: Number(location?.latitude) || 31.24,
+    longitude: Number(location?.longitude) || 121.42
+  };
+}
+
+function normalizeLocations(config = {}) {
+  const configured = Array.isArray(config.locations) ? config.locations : [];
+  const locations = configured
+    .map((location, index) => ({
+      id: location.id || `location-${index + 1}`,
+      name: location.name || `地点 ${index + 1}`,
+      latitude: Number(location.latitude),
+      longitude: Number(location.longitude),
+      default: Boolean(location.default)
+    }))
+    .filter(location => Number.isFinite(location.latitude) && Number.isFinite(location.longitude));
+
+  if (locations.length > 0) return locations;
+
+  return [{
+    id: 'global-harbor',
+    name: '我格广场',
+    latitude: 31.24,
+    longitude: 121.42,
+    default: true
+  }];
 }
 
 // 获取最新报告的辅助函数
@@ -294,16 +344,19 @@ function getLatestReport() {
     if (reportFiles.length === 0) return null;
     
     const latestFile = path.join(logsDir, reportFiles[0].file);
-    return decorateReport(JSON.parse(fs.readFileSync(latestFile, 'utf8')));
+    return decorateReport(JSON.parse(fs.readFileSync(latestFile, 'utf8')), { includeScreenshotData: true });
   } catch (error) {
-    console.error('获取最新报告失败:', error);
+    Utils.writeConsole('error', '获取最新报告失败', error);
     return null;
   }
 }
 
-function decorateReport(report) {
+function decorateReport(report, options = {}) {
   const latestScreenshot = report.latestScreenshot || findLatestScreenshot();
   const filename = latestScreenshot?.filename ? path.basename(latestScreenshot.filename) : null;
+  const screenshotDataUrl = options.includeScreenshotData && filename
+    ? readScreenshotDataUrl(filename)
+    : null;
 
   return {
     ...report,
@@ -313,8 +366,20 @@ function decorateReport(report) {
           filename
         }
       : null,
-    screenshotUrl: filename ? `/api/screenshots/${encodeURIComponent(filename)}` : null
+    screenshotUrl: filename ? `/api/screenshots/${encodeURIComponent(filename)}` : null,
+    screenshotDataUrl
   };
+}
+
+function readScreenshotDataUrl(filename) {
+  try {
+    const filePath = path.join(Utils.getLogsDir(), path.basename(filename));
+    if (!fs.existsSync(filePath)) return null;
+    const buffer = fs.readFileSync(filePath);
+    return `data:image/png;base64,${buffer.toString('base64')}`;
+  } catch {
+    return null;
+  }
 }
 
 function findLatestScreenshot() {

@@ -5,7 +5,6 @@ const path = require('path');
 const fs = require('fs');
 const { RateLimiterMemory } = require('rate-limiter-flexible');
 
-const AutoClockInApp = require('./main');
 const Utils = require('./modules/utils');
 const apiRoutes = require('./web/routes/api');
 
@@ -95,8 +94,7 @@ class WebServer {
 
     // 日志中间件
     this.app.use((req, res, next) => {
-      const timestamp = new Date().toISOString();
-      console.log(`[${timestamp}] ${req.method} ${req.path} - ${req.ip}`);
+      Utils.writeConsole('info', `${req.method} ${req.path}`, { ip: req.ip });
       next();
     });
   }
@@ -179,7 +177,7 @@ class WebServer {
 
     // 全局错误处理
     this.app.use((err, req, res, next) => {
-      console.error('服务器错误:', err);
+      Utils.writeConsole('error', '服务器错误', err);
       res.status(500).json({ 
         success: false, 
         message: process.env.NODE_ENV === 'production' 
@@ -216,17 +214,17 @@ class WebServer {
       });
 
       this.app.listen(this.port, '0.0.0.0', () => {
-        console.log(`🚀 ECR 工作台服务已启动！`);
-        console.log(`📱 Web界面: http://localhost:${this.port}`);
-        console.log(`🔗 API文档: http://localhost:${this.port}/api/docs`);
-        console.log(`💓 健康检查: http://localhost:${this.port}/health`);
+        Utils.writeConsole('info', 'ECR 工作台服务已启动');
+        Utils.writeConsole('info', `Web界面: http://localhost:${this.port}`);
+        Utils.writeConsole('info', `API文档: http://localhost:${this.port}/api/docs`);
+        Utils.writeConsole('info', `健康检查: http://localhost:${this.port}/health`);
         
         if (process.env.NODE_ENV !== 'production') {
-          console.log(`🔧 开发模式已启用`);
+          Utils.writeConsole('info', '开发模式已启用');
         }
       });
     } catch (error) {
-      console.error('❌ 服务器启动失败:', error);
+      Utils.writeConsole('error', '服务器启动失败', error);
       process.exit(1);
     }
   }

@@ -2,12 +2,15 @@ class ECRHRApp {
     constructor() {
         this.apiBase = '/api';
         this.accountStorageKey = 'ecr-hr-saved-accounts';
+        this.locations = [];
+        this.defaultLocation = { id: 'global-harbor', name: '我格广场', latitude: 31.24, longitude: 121.42, default: true };
         this.init();
     }
 
     init() {
         this.bindEvents();
         this.renderSavedAccounts();
+        this.loadAppConfig();
         this.validateForm();
         this.updateTime();
         this.loadCalendarStatus();
@@ -42,6 +45,21 @@ class ECRHRApp {
         if (deleteAccountBtn) {
             deleteAccountBtn.addEventListener('click', () => this.deleteSelectedAccount());
         }
+
+        const credentialsToggle = document.getElementById('credentials-toggle');
+        if (credentialsToggle) {
+            credentialsToggle.addEventListener('click', () => this.toggleCredentials());
+        }
+
+        const locationSelect = document.getElementById('location-select');
+        if (locationSelect) {
+            locationSelect.addEventListener('change', () => this.applySelectedLocation());
+        }
+
+        ['latitude', 'longitude'].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) input.addEventListener('input', () => this.applySelectedLocation());
+        });
         
         const form = document.getElementById('clockin-form');
         if (form) {
@@ -66,6 +84,80 @@ class ECRHRApp {
                 }
             });
         });
+    }
+
+    renderLocationOptions(defaultLocationId = '') {
+        const locationSelect = document.getElementById('location-select');
+        if (!locationSelect) return;
+
+        locationSelect.innerHTML = '';
+        this.locations.forEach(location => {
+            const option = document.createElement('option');
+            option.value = location.id;
+            option.textContent = location.name;
+            locationSelect.appendChild(option);
+        });
+
+        const customOption = document.createElement('option');
+        customOption.value = 'custom';
+        customOption.textContent = '自定义坐标';
+        locationSelect.appendChild(customOption);
+
+        const selectedId = defaultLocationId || this.locations.find(location => location.default)?.id || this.locations[0]?.id || 'custom';
+        locationSelect.value = this.locations.some(location => location.id === selectedId) ? selectedId : 'custom';
+        this.applySelectedLocation();
+    }
+
+    applySelectedLocation() {
+        const locationSelect = document.getElementById('location-select');
+        const customFields = document.getElementById('custom-location-fields');
+        const latitudeInput = document.getElementById('latitude');
+        const longitudeInput = document.getElementById('longitude');
+        const selectedId = locationSelect?.value || 'custom';
+        const selectedLocation = this.locations.find(location => location.id === selectedId);
+        const isCustom = selectedId === 'custom' || !selectedLocation;
+
+        if (customFields) customFields.hidden = !isCustom;
+
+        if (selectedLocation) {
+            if (latitudeInput) latitudeInput.value = selectedLocation.latitude;
+            if (longitudeInput) longitudeInput.value = selectedLocation.longitude;
+        }
+
+    }
+
+    toggleCredentials(forceExpanded = null) {
+        const card = document.getElementById('credentials-card');
+        const body = document.getElementById('credentials-body');
+        const toggle = document.getElementById('credentials-toggle');
+        if (!card || !body || !toggle) return;
+
+        const shouldExpand = forceExpanded ?? card.classList.contains('is-collapsed');
+        card.classList.toggle('is-collapsed', !shouldExpand);
+        body.hidden = !shouldExpand;
+        toggle.setAttribute('aria-expanded', String(shouldExpand));
+
+        const icon = toggle.querySelector('.fa-chevron-up, .fa-chevron-down');
+        if (icon) {
+            icon.className = `fas ${shouldExpand ? 'fa-chevron-up' : 'fa-chevron-down'}`;
+        }
+    }
+
+    async loadAppConfig() {
+        try {
+            const response = await fetch(`${this.apiBase}/config`);
+            const data = await response.json();
+            if (!data.success) throw new Error(data.message || '配置加载失败');
+
+            this.locations = Array.isArray(data.data?.locations) && data.data.locations.length > 0
+                ? data.data.locations
+                : [this.defaultLocation];
+            this.renderLocationOptions(data.data?.defaultLocationId);
+        } catch (error) {
+            console.error('配置加载失败:', error);
+            this.locations = [this.defaultLocation];
+            this.renderLocationOptions(this.defaultLocation.id);
+        }
     }
 
     // 设置按钮加载状态
@@ -142,41 +234,23 @@ class ECRHRApp {
                 const screenshotMarkup = this.renderScreenshotPreview(data.data);
                 
                 resultContent.innerHTML = `
-                    <div class="result-summary">
-                        <i class="fas fa-flask fs-3 me-2"></i>
-                        <h5 class="mb-0">测试结果</h5>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <strong>测试时间:</strong><br>
-                            <small class="text-muted">${timestamp}</small>
+                    <div class="result-meta-grid">
+                        <div class="result-meta-item ${data.data?.results?.login ? 'is-success' : 'is-failure'}">
+                            <span>登录</span>
+                            <strong>${loginStatus}</strong>
                         </div>
-                        <div class="col-md-6">
-                            <strong>执行模式:</strong><br>
-                            <small class="text-muted">无头模式 (测试)</small>
+                        <div class="result-meta-item ${data.data?.results?.clockin ? 'is-success' : 'is-failure'}">
+                            <span>页面访问</span>
+                            <strong>${clockinStatus}</strong>
                         </div>
-                    </div>
-                    <div class="mt-3">
-                        <strong>流程检查:</strong>
-                        <div class="metric-grid mt-2">
-                            <div class="metric-card">
-                                <i class="fas fa-sign-in-alt ${data.data?.results?.login ? 'text-success' : 'text-danger'}"></i>
-                                <div><small>登录 ${loginStatus}</small></div>
-                            </div>
-                            <div class="metric-card">
-                                <i class="fas fa-clock ${data.data?.results?.clockin ? 'text-success' : 'text-danger'}"></i>
-                                <div><small>操作模拟 ${clockinStatus}</small></div>
-                            </div>
-                            <div class="metric-card">
-                                <i class="fas fa-check-circle ${data.success ? 'text-success' : 'text-danger'}"></i>
-                                <div><small>整体 ${data.success ? '✅ 通过' : '❌ 失败'}</small></div>
-                            </div>
+                        <div class="result-meta-item">
+                            <span>模式</span>
+                            <strong>无头测试</strong>
                         </div>
                     </div>
-                    <div class="mt-3">
+                    <div class="result-note mt-3">
                         <small class="text-muted">
-                            <i class="fas fa-info-circle me-1"></i>
-                            测试不会实际操作，仅验证登录和页面访问流程
+                            <i class="fas fa-info-circle me-1"></i>${timestamp} · 测试不会实际操作
                         </small>
                     </div>
                     ${screenshotMarkup}
@@ -191,12 +265,14 @@ class ECRHRApp {
     }
 
     renderScreenshotPreview(report) {
-        const screenshotUrl = report?.screenshotUrl;
+        const screenshotUrl = report?.screenshotDataUrl || report?.screenshotUrl;
         if (!screenshotUrl) return '';
 
         const filename = report?.latestScreenshot?.filename || '最后截图';
         const safeUrl = this.escapeHtml(screenshotUrl);
         const safeFilename = this.escapeHtml(filename);
+        const openUrl = report?.screenshotUrl || screenshotUrl;
+        const safeOpenUrl = this.escapeHtml(openUrl);
 
         return `
             <div class="screenshot-preview mt-3">
@@ -204,7 +280,7 @@ class ECRHRApp {
                     <span><i class="fas fa-image me-2"></i>最后截图</span>
                     <small>${safeFilename}</small>
                 </div>
-                <a href="${safeUrl}" target="_blank" rel="noopener" class="screenshot-link">
+                <a href="${safeOpenUrl}" target="_blank" rel="noopener" class="screenshot-link">
                     <img src="${safeUrl}" alt="最后截图：${safeFilename}" loading="lazy">
                 </a>
             </div>
@@ -247,12 +323,17 @@ class ECRHRApp {
 
     // 获取表单数据
     getFormData() {
+        const locationSelect = document.getElementById('location-select');
+        const selectedLocation = this.locations.find(location => location.id === locationSelect?.value);
+        const latitude = selectedLocation?.latitude ?? parseFloat(document.getElementById('latitude')?.value) ?? 31.24;
+        const longitude = selectedLocation?.longitude ?? parseFloat(document.getElementById('longitude')?.value) ?? 121.42;
+
         return {
             username: document.getElementById('username')?.value.trim() || '',
             password: document.getElementById('password')?.value.trim() || '',
             location: {
-                latitude: parseFloat(document.getElementById('latitude')?.value) || 31.24,
-                longitude: parseFloat(document.getElementById('longitude')?.value) || 121.42
+                latitude,
+                longitude
             }
         };
     }
@@ -307,7 +388,7 @@ class ECRHRApp {
         const statusDot = document.getElementById('system-status');
 
         const dayLabel = calendar.isWorkday ? '工作日' : '休息日';
-        const detailText = calendar.name ? `${dayLabel} · ${calendar.name}` : dayLabel;
+        const detailText = calendar.isWorkday ? dayLabel : (calendar.name ? `${dayLabel} · ${calendar.name}` : dayLabel);
 
         if (label) label.textContent = detailText;
         if (detail) {
@@ -466,36 +547,24 @@ class ECRHRApp {
                 const clockinStatus = data.data?.results?.clockin ? '✅ 成功' : '❌ 失败';
                 
                 resultContent.innerHTML = `
-                    <div class="result-summary">
-                        <i class="fas fa-${success ? 'check-circle' : 'times-circle'} fs-3 me-2"></i>
-                        <h5 class="mb-0">${success ? '操作成功' : '操作失败'}</h5>
+                    <div class="result-meta-grid">
+                        <div class="result-meta-item ${data.data?.results?.login ? 'is-success' : 'is-failure'}">
+                            <span>登录</span>
+                            <strong>${loginStatus}</strong>
+                        </div>
+                        <div class="result-meta-item ${data.data?.results?.clockin ? 'is-success' : 'is-failure'}">
+                            <span>操作</span>
+                            <strong>${clockinStatus}</strong>
+                        </div>
+                        <div class="result-meta-item">
+                            <span>模式</span>
+                            <strong>无头执行</strong>
+                        </div>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <strong>执行时间:</strong><br>
-                            <small class="text-muted">${timestamp}</small>
-                        </div>
-                        <div class="col-md-6">
-                            <strong>执行模式:</strong><br>
-                            <small class="text-muted">无头模式 (真实)</small>
-                        </div>
-                    </div>
-                    <div class="mt-3">
-                        <strong>执行结果:</strong>
-                        <div class="metric-grid mt-2">
-                            <div class="metric-card">
-                                <i class="fas fa-sign-in-alt ${data.data?.results?.login ? 'text-success' : 'text-danger'}"></i>
-                                <div><small>登录 ${loginStatus}</small></div>
-                            </div>
-                            <div class="metric-card">
-                                <i class="fas fa-clock ${data.data?.results?.clockin ? 'text-success' : 'text-danger'}"></i>
-                                <div><small>操作 ${clockinStatus}</small></div>
-                            </div>
-                            <div class="metric-card">
-                                <i class="fas fa-${success ? 'check-circle' : 'times-circle'} ${success ? 'text-success' : 'text-danger'}"></i>
-                                <div><small>整体 ${success ? '✅ 成功' : '❌ 失败'}</small></div>
-                            </div>
-                        </div>
+                    <div class="result-note mt-3">
+                        <small class="text-muted">
+                            <i class="fas fa-clock me-1"></i>${timestamp}
+                        </small>
                     </div>
                 `;
                 
@@ -530,11 +599,21 @@ class ECRHRApp {
     }
 
     renderSavedAccounts(selectedUsername = '') {
+        const savedAccountField = document.getElementById('saved-account-field');
         const accountSelect = document.getElementById('saved-account');
         const deleteAccountBtn = document.getElementById('delete-account');
         if (!accountSelect) return;
 
         const accounts = this.getSavedAccounts();
+        if (savedAccountField) savedAccountField.hidden = accounts.length === 0;
+
+        if (accounts.length === 0) {
+            accountSelect.innerHTML = '<option value="">暂无本地记录</option>';
+            if (deleteAccountBtn) deleteAccountBtn.disabled = true;
+            this.toggleCredentials(true);
+            return;
+        }
+
         accountSelect.innerHTML = '<option value="">选择已保存手机号</option>';
 
         accounts.forEach(account => {
@@ -544,13 +623,14 @@ class ECRHRApp {
             accountSelect.appendChild(option);
         });
 
-        accountSelect.value = selectedUsername;
+        accountSelect.value = selectedUsername || accounts[0]?.username || '';
         if (deleteAccountBtn) {
             deleteAccountBtn.disabled = !accountSelect.value;
         }
+        this.applySavedAccount({ collapse: Boolean(accountSelect.value) });
     }
 
-    applySavedAccount() {
+    applySavedAccount(options = {}) {
         const accountSelect = document.getElementById('saved-account');
         const deleteAccountBtn = document.getElementById('delete-account');
         if (!accountSelect) return;
@@ -560,7 +640,10 @@ class ECRHRApp {
             deleteAccountBtn.disabled = !selectedUsername;
         }
 
-        if (!selectedUsername) return;
+        if (!selectedUsername) {
+            this.toggleCredentials(true);
+            return;
+        }
 
         const account = this.getSavedAccounts().find(item => item.username === selectedUsername);
         if (!account) return;
@@ -572,6 +655,10 @@ class ECRHRApp {
         if (usernameInput) usernameInput.value = account.username;
         if (passwordInput) passwordInput.value = account.password || '';
         if (rememberAccount) rememberAccount.checked = true;
+
+        if (options.collapse !== false) {
+            this.toggleCredentials(false);
+        }
 
         this.validateForm();
     }

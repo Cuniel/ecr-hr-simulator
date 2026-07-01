@@ -3,13 +3,17 @@ const fs = require('fs');
 const Utils = require('./utils');
 
 class BrowserManager {
-  constructor() {
+  constructor(config = Utils.loadConfig()) {
     this.browser = null;
+    this.context = null;
     this.page = null;
-    this.config = Utils.loadConfig();
+    this.config = config;
+    this.profileDir = null;
   }
 
-  async init(headless = false) {
+  async init(headless = false, config = this.config) {
+    this.config = config;
+    const location = this.getLocation();
     Utils.log('info', `🚀 启动浏览器 (${headless ? '无头模式' : '可见模式'})...`);
 
     const executablePath = this.getChromiumExecutablePath();
@@ -17,14 +21,24 @@ class BrowserManager {
       Utils.log('info', `🌐 使用 Chromium: ${executablePath}`);
     }
 
-    this.prepareChromiumRuntime();
+    this.profileDir = this.prepareChromiumRuntime();
 
-    this.browser = await chromium.launch({
+    this.context = await chromium.launchPersistentContext(this.profileDir, {
       headless: headless,
       slowMo: headless ? 0 : 200,
       executablePath,
       chromiumSandbox: false,
       timeout: 60000,
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1',
+      viewport: { width: 375, height: 667 },
+      deviceScaleFactor: 2,
+      isMobile: true,
+      hasTouch: true,
+      geolocation: {
+        latitude: location.latitude,
+        longitude: location.longitude
+      },
+      permissions: ['geolocation'],
       env: {
         ...process.env,
         HOME: process.env.HOME || '/tmp',
@@ -35,20 +49,14 @@ class BrowserManager {
       args: this.getChromiumArgs()
     });
 
-    const context = await this.browser.newContext({
-      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1',
-      viewport: { width: 375, height: 667 },
-      deviceScaleFactor: 2,
-      isMobile: true,
-      hasTouch: true,
-      geolocation: {
-        latitude: this.config.location.latitude,
-        longitude: this.config.location.longitude
-      },
-      permissions: ['geolocation']
+    this.browser = this.context.browser();
+    await this.context.setGeolocation({
+      latitude: location.latitude,
+      longitude: location.longitude
     });
+    await this.context.grantPermissions(['geolocation']);
 
-    this.page = await context.newPage();
+    this.page = this.context.pages()[0] || await this.context.newPage();
     this.page.setDefaultTimeout(30000);
 
     // 监听请求
@@ -61,6 +69,7 @@ class BrowserManager {
     // 监听浏览器控制台日志，统一写入执行 trace
     this.page.on('console', async msg => {
       const level = msg.type() === 'error' ? 'error' : msg.type() === 'warning' ? 'warning' : 'debug';
+      if (level === 'debug' && process.env.DEBUG_BROWSER_CONSOLE !== '1') return;
       const values = [];
       for (const arg of msg.args()) {
         try {
@@ -69,7 +78,7 @@ class BrowserManager {
           values.push(String(arg));
         }
       }
-      Utils.log(level, `浏览器Console[${msg.type()}]: ${msg.text()}`, ...values);
+      Utils.log(level, `浏览器Console[${msg.type()}]: ${msg.text()}`, ...values.filter(value => value !== msg.text()));
     });
 
     this.page.on('pageerror', error => {
@@ -81,8 +90,14 @@ class BrowserManager {
   }
 
   async close() {
-    if (this.browser) {
+    if (this.context) {
+      await this.context.close();
+      this.context = null;
+      this.browser = null;
+      Utils.log('info', '🔒 浏览器已关闭');
+    } else if (this.browser) {
       await this.browser.close();
+      this.browser = null;
       Utils.log('info', '🔒 浏览器已关闭');
     }
   }
@@ -103,9 +118,18 @@ class BrowserManager {
     return candidates.find(candidate => fs.existsSync(candidate));
   }
 
+  getLocation() {
+    const location = this.config?.location || {};
+    return {
+      latitude: Number(location.latitude) || 31.24,
+      longitude: Number(location.longitude) || 121.42
+    };
+  }
+
   prepareChromiumRuntime() {
+    const profileDir = `/tmp/ecr-hr-simulator/chromium-profile-${process.pid}-${Date.now()}`;
     const dirs = [
-      '/tmp/ecr-hr-simulator/chromium-profile',
+      profileDir,
       '/tmp/ecr-hr-simulator/chromium-cache',
       '/tmp/ecr-hr-simulator/chromium-data',
       process.env.XDG_CACHE_HOME || '/tmp/.cache',
@@ -121,6 +145,8 @@ class BrowserManager {
         Utils.log('warning', `创建 Chromium 运行目录失败: ${dir}`, error.message);
       }
     }
+
+    return profileDir;
   }
 
   getChromiumArgs() {
@@ -150,7 +176,6 @@ class BrowserManager {
       '--no-default-browser-check',
       '--no-zygote',
       '--disable-features=site-per-process,Translate,BackForwardCache,AcceptCHFrame,MediaRouter,OptimizationHints',
-      '--user-data-dir=/tmp/ecr-hr-simulator/chromium-profile',
       '--data-path=/tmp/ecr-hr-simulator/chromium-data',
       '--disk-cache-dir=/tmp/ecr-hr-simulator/chromium-cache'
     ];

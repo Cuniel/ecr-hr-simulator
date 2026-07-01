@@ -1,11 +1,11 @@
 {
-  "username": "",
-  "password": "",
-  "location": {
-    "latitude": 31.24,
-    "longitude": 121.42
-  },
-  "timeout": 30000,
-  "testMode": true,
-  "dryRun": true
+  "locations": [
+    {
+      "id": "global-harbor",
+      "name": "我格广场",
+      "latitude": 31.24,
+      "longitude": 121.42,
+      "default": true
+    }
+  ]
 }

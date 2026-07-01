@@ -6,13 +6,29 @@ const Utils = require('./modules/utils');
 class AutoClockInApp {
   constructor() {
     this.browserManager = new BrowserManager();
-    this.config = Utils.loadConfig();
+    const config = Utils.loadConfig();
+    this.config = {
+      ...config,
+      username: process.env.ECR_USERNAME || '',
+      password: process.env.ECR_PASSWORD || '',
+      location: this.getDefaultLocation(config),
+      dryRun: false
+    };
     this.results = {
       login: false,
       clockin: false,
       startTime: null,
       endTime: null,
       errors: []
+    };
+  }
+
+  getDefaultLocation(config = {}) {
+    const locations = Array.isArray(config.locations) ? config.locations : [];
+    const defaultLocation = locations.find(location => location.default) || locations[0] || {};
+    return {
+      latitude: Number(defaultLocation.latitude) || 31.24,
+      longitude: Number(defaultLocation.longitude) || 121.42
     };
   }
 
@@ -36,7 +52,7 @@ class AutoClockInApp {
       }
 
       // 初始化浏览器
-      const page = await this.browserManager.init(headless);
+      const page = await this.browserManager.init(headless, this.config);
 
       // 执行登录
       Utils.log('info', '🔐 开始登录阶段...');
@@ -117,17 +133,17 @@ if (require.main === module) {
 
   // 无头模式启动提示
   if (options.headless) {
-    console.log('🤖 无头模式启动中...');
-    console.log(`📊 执行过程将通过日志输出，截图和报告将保存在 ${Utils.getLogsDir()} 目录`);
-    console.log('⏳ 请耐心等待...\n');
+    Utils.log('info', '无头模式启动中');
+    Utils.log('info', `执行过程将通过日志输出，截图和报告将保存在 ${Utils.getLogsDir()} 目录`);
+    Utils.log('info', '请耐心等待');
   }
 
   AutoClockInApp.start(options)
     .then(success => {
       if (options.headless) {
-        console.log('\n🏁 无头模式执行完成');
-        console.log(`📊 最终结果: ${success ? '✅ 成功' : '❌ 失败'}`);
-        console.log(`📁 详细日志请查看 ${Utils.getLogsDir()} 目录`);
+        Utils.log('info', '无头模式执行完成');
+        Utils.log('info', `最终结果: ${success ? '成功' : '失败'}`);
+        Utils.log('info', `详细日志请查看 ${Utils.getLogsDir()} 目录`);
       }
       process.exit(success ? 0 : 1);
     })
