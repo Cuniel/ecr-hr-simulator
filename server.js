@@ -65,6 +65,32 @@ class WebServer {
   setupMiddleware() {
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true }));
+
+    // API Gateway Stage / 路由前缀兼容：
+    // 中国区 API Gateway HTTP API 会把 stage 名（例如 /default）带到 Lambda Web Adapter。
+    // 如果通过 /default 或 /default/ecr-hr 访问，这里先把前缀剥掉，再交给 Express 原有路由处理。
+    this.app.use((req, res, next) => {
+      const prefixes = (process.env.BASE_PATHS || '/default/ecr-hr,/default,/ecr-hr')
+        .split(',')
+        .map(prefix => prefix.trim())
+        .filter(Boolean)
+        .sort((a, b) => b.length - a.length);
+
+      for (const prefix of prefixes) {
+        if (req.url === prefix) {
+          req.url = '/';
+          break;
+        }
+
+        if (req.url.startsWith(`${prefix}/`)) {
+          req.url = req.url.slice(prefix.length) || '/';
+          break;
+        }
+      }
+
+      next();
+    });
+
     this.app.use(express.static(path.join(__dirname, 'web/public')));
 
     // 日志中间件
@@ -84,8 +110,13 @@ class WebServer {
       res.sendFile(path.join(__dirname, 'web/public/index.html'));
     });
 
-    // 健康检查 (AWS ALB 需要)
-    this.app.get('/health', (req, res) => {
+    // 兼容 API Gateway 带前缀访问首页
+    this.app.get(['/default', '/default/', '/ecr-hr', '/ecr-hr/', '/default/ecr-hr', '/default/ecr-hr/'], (req, res) => {
+      res.sendFile(path.join(__dirname, 'web/public/index.html'));
+    });
+
+    // 健康检查 (AWS ALB / Lambda Web Adapter 需要)
+    this.app.get(['/health', '/default/health', '/ecr-hr/health', '/default/ecr-hr/health'], (req, res) => {
       res.json({ 
         status: 'healthy', 
         timestamp: new Date().toISOString(),
@@ -96,7 +127,7 @@ class WebServer {
     // 日志查看 (管理员功能)
     this.app.get('/logs', this.requireAuth, (req, res) => {
       try {
-        const logsDir = path.join(__dirname, 'logs');
+        const logsDir = Utils.getLogsDir();
         if (!fs.existsSync(logsDir)) {
           return res.json({ logs: [] });
         }
@@ -124,7 +155,7 @@ class WebServer {
     this.app.get('/logs/:filename', this.requireAuth, (req, res) => {
       try {
         const filename = req.params.filename;
-        const filePath = path.join(__dirname, 'logs', filename);
+        const filePath = path.join(Utils.getLogsDir(), filename);
         
         if (!fs.existsSync(filePath) || !filename.endsWith('.json')) {
           return res.status(404).json({ success: false, message: '文件不存在' });
@@ -176,9 +207,9 @@ class WebServer {
   async start() {
     try {
       // 确保必要目录存在
-      const dirs = ['logs', 'web/public'];
+      const dirs = [Utils.getLogsDir(), path.join(__dirname, 'web/public')];
       dirs.forEach(dir => {
-        const fullPath = path.join(__dirname, dir);
+        const fullPath = path.isAbsolute(dir) ? dir : path.join(__dirname, dir);
         if (!fs.existsSync(fullPath)) {
           fs.mkdirSync(fullPath, { recursive: true });
         }

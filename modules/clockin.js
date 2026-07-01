@@ -290,9 +290,9 @@ class ClockIn {
       // 保存点击前截图
       await Utils.saveScreenshot(this.page, `before-click-${Utils.getCurrentTimestamp()}.png`);
 
-      // DRY RUN 模式检查
+      // 测试模式检查
       if (this.config.dryRun) {
-        Utils.log('info', '🚫 DRY RUN 模式：跳过实际点击');
+        Utils.log('info', '🚫 测试模式：跳过实际点击');
         return true;
       }
 

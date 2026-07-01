@@ -139,6 +139,7 @@ class ECRHRApp {
                 const timestamp = data.timestamp ? new Date(data.timestamp).toLocaleString('zh-CN') : '刚刚';
                 const loginStatus = data.data?.results?.login ? '✅ 成功' : '❌ 失败';
                 const clockinStatus = data.data?.results?.clockin ? '✅ 成功' : '❌ 失败';
+                const screenshotMarkup = this.renderScreenshotPreview(data.data);
                 
                 resultContent.innerHTML = `
                     <div class="result-summary">
@@ -178,6 +179,7 @@ class ECRHRApp {
                             测试不会实际操作，仅验证登录和页面访问流程
                         </small>
                     </div>
+                    ${screenshotMarkup}
                 `;
                 
                 resultCard.className = `panel result-panel fade-in ${data.success ? 'result-test' : 'result-failure'}`;
@@ -186,6 +188,36 @@ class ECRHRApp {
             }
         }
         
+    }
+
+    renderScreenshotPreview(report) {
+        const screenshotUrl = report?.screenshotUrl;
+        if (!screenshotUrl) return '';
+
+        const filename = report?.latestScreenshot?.filename || '最后截图';
+        const safeUrl = this.escapeHtml(screenshotUrl);
+        const safeFilename = this.escapeHtml(filename);
+
+        return `
+            <div class="screenshot-preview mt-3">
+                <div class="screenshot-header">
+                    <span><i class="fas fa-image me-2"></i>最后截图</span>
+                    <small>${safeFilename}</small>
+                </div>
+                <a href="${safeUrl}" target="_blank" rel="noopener" class="screenshot-link">
+                    <img src="${safeUrl}" alt="最后截图：${safeFilename}" loading="lazy">
+                </a>
+            </div>
+        `;
+    }
+
+    escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     // 表单验证

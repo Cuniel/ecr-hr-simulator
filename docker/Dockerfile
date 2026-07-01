@@ -1,11 +1,8 @@
-FROM node:22.22.3-alpine
+FROM public.ecr.aws/docker/library/node:22-alpine
 
-# 设置工作目录
 WORKDIR /app
 
-# 安装必要的系统依赖
-RUN apk add --no-cache \
-    # Chromium 和基础依赖
+RUN apk upgrade --no-cache && apk add --no-cache \
     chromium \
     nss \
     freetype \
@@ -13,15 +10,14 @@ RUN apk add --no-cache \
     harfbuzz \
     ca-certificates \
     ttf-freefont \
-    # 额外的字体支持
     font-noto-cjk \
     wqy-zenhei \
-    # 其他必要依赖
     dbus \
     xvfb \
-    # 调试工具 (可选)
-    curl \
-    wget
+    curl
+
+# AWS Lambda Web Adapter：让普通 HTTP Web 服务可以作为 Lambda Container Image 运行
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:1.0.1 /lambda-adapter /opt/extensions/lambda-adapter
 
 # 设置 Playwright/Chromium 环境变量
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
@@ -29,9 +25,15 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser \
     CHROME_BIN=/usr/bin/chromium-browser \
     CHROME_PATH=/usr/bin/chromium-browser \
-    # 无头模式优化
+    PORT=3000 \
+    AWS_LWA_PORT=3000 \
+    AWS_LWA_READINESS_CHECK_PATH=/health \
+    AWS_LWA_READINESS_CHECK_PROTOCOL=http \
+    HOME=/tmp \
+    XDG_CACHE_HOME=/tmp/.cache \
+    XDG_CONFIG_HOME=/tmp/.config \
+    XDG_RUNTIME_DIR=/tmp/runtime \
     DISPLAY=:99 \
-    # Node.js 优化
     NODE_ENV=production \
     NODE_OPTIONS="--max-old-space-size=2048"
 
@@ -45,7 +47,14 @@ RUN npm ci --omit=dev --no-audit --no-fund
 COPY . .
 
 # 创建必要目录
-RUN mkdir -p logs web/public temp screenshots reports
+RUN mkdir -p logs web/public temp screenshots reports \
+    /tmp/ecr-hr-simulator/logs \
+    /tmp/ecr-hr-simulator/chromium-profile \
+    /tmp/ecr-hr-simulator/chromium-cache \
+    /tmp/ecr-hr-simulator/chromium-data \
+    /tmp/.cache \
+    /tmp/.config \
+    /tmp/runtime
 
 # 创建非 root 用户 (安全考虑)
 RUN addgroup -g 1001 -S nodejs && \
@@ -53,14 +62,14 @@ RUN addgroup -g 1001 -S nodejs && \
 
 # 设置目录权限
 RUN chown -R ecr-hr:nodejs /app && \
-    chmod -R 755 /app
+    chown -R ecr-hr:nodejs /tmp/ecr-hr-simulator /tmp/.cache /tmp/.config /tmp/runtime && \
+    chmod -R 755 /app && \
+    chmod 700 /tmp/runtime
 
 # 切换到非 root 用户
 USER ecr-hr
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:3000/health || exit 1
+# Lambda 不使用 Docker HEALTHCHECK；本地 docker run 时可手动访问 /health 检查
 
 # 暴露端口
 EXPOSE 3000

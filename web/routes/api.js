@@ -1,6 +1,7 @@
 const express = require('express');
 const AutoClockInApp = require('../../main');
 const ChineseCalendar = require('../../modules/chineseCalendar');
+const Utils = require('../../modules/utils');
 const fs = require('fs');
 const path = require('path');
 
@@ -13,9 +14,10 @@ router.get('/docs', (req, res) => {
     version: '2.0.0',
     endpoints: {
       'POST /api/clockin': '执行操作',
-      'POST /api/test': '测试操作 (DRY RUN)',
+      'POST /api/test': '测试操作',
       'GET /api/status': '获取系统状态',
       'GET /api/calendar/today': '获取今日工作日状态',
+      'GET /api/screenshots/:filename': '查看执行截图',
       'GET /api/logs': '获取执行日志',
       'GET /api/logs/:limit': '获取指定数量的执行日志'
     }
@@ -100,7 +102,7 @@ router.post('/validate', async (req, res) => {
   }
 });
 
-// 测试操作 (DRY RUN)
+// 测试操作
 router.post('/test', async (req, res) => {
   try {
     const { username, password, location } = req.body;
@@ -181,6 +183,27 @@ router.post('/clockin', async (req, res) => {
   }
 });
 
+// 查看执行截图
+router.get('/screenshots/:filename', (req, res) => {
+  try {
+    const logsDir = Utils.getLogsDir();
+    const filename = path.basename(req.params.filename);
+
+    if (!/\.png$/i.test(filename)) {
+      return res.status(400).json({ success: false, message: '截图文件格式不正确' });
+    }
+
+    const filePath = path.join(logsDir, filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: '截图不存在' });
+    }
+
+    res.sendFile(filePath);
+  } catch (error) {
+    res.status(500).json({ success: false, message: '读取截图失败: ' + error.message });
+  }
+});
+
 // 修复：分别处理有参数和无参数的日志路由
 router.get('/logs', (req, res) => {
   handleLogsRequest(req, res, 10); // 默认返回10条
@@ -194,7 +217,7 @@ router.get('/logs/:limit', (req, res) => {
 // 处理日志请求的公共函数
 function handleLogsRequest(req, res, limit) {
   try {
-    const logsDir = path.join(__dirname, '../../logs');
+    const logsDir = Utils.getLogsDir();
     
     if (!fs.existsSync(logsDir)) {
       return res.json({ success: true, data: [] });
@@ -209,14 +232,18 @@ function handleLogsRequest(req, res, limit) {
         try {
           const content = JSON.parse(fs.readFileSync(filePath, 'utf8'));
           
+          const decorated = decorateReport(content);
           return {
             filename: file,
-            timestamp: content.timestamp,
-            success: content.success,
-            mode: content.mode,
-            dryRun: content.dryRun,
-            account: content.account,
-            results: content.results,
+            timestamp: decorated.timestamp,
+            success: decorated.success,
+            mode: decorated.mode,
+            testMode: decorated.testMode ?? decorated.dryRun,
+            dryRun: decorated.dryRun,
+            account: decorated.account,
+            results: decorated.results,
+            latestScreenshot: decorated.latestScreenshot,
+            screenshotUrl: decorated.screenshotUrl,
             size: stats.size,
             modified: stats.mtime.toISOString()
           };
@@ -252,7 +279,7 @@ function buildRunConfig({ username, password, location, dryRun }) {
 // 获取最新报告的辅助函数
 function getLatestReport() {
   try {
-    const logsDir = path.join(__dirname, '../../logs');
+    const logsDir = Utils.getLogsDir();
     if (!fs.existsSync(logsDir)) return null;
     
     const reportFiles = fs.readdirSync(logsDir)
@@ -267,9 +294,49 @@ function getLatestReport() {
     if (reportFiles.length === 0) return null;
     
     const latestFile = path.join(logsDir, reportFiles[0].file);
-    return JSON.parse(fs.readFileSync(latestFile, 'utf8'));
+    return decorateReport(JSON.parse(fs.readFileSync(latestFile, 'utf8')));
   } catch (error) {
     console.error('获取最新报告失败:', error);
+    return null;
+  }
+}
+
+function decorateReport(report) {
+  const latestScreenshot = report.latestScreenshot || findLatestScreenshot();
+  const filename = latestScreenshot?.filename ? path.basename(latestScreenshot.filename) : null;
+
+  return {
+    ...report,
+    latestScreenshot: latestScreenshot
+      ? {
+          ...latestScreenshot,
+          filename
+        }
+      : null,
+    screenshotUrl: filename ? `/api/screenshots/${encodeURIComponent(filename)}` : null
+  };
+}
+
+function findLatestScreenshot() {
+  try {
+    const logsDir = Utils.getLogsDir();
+    if (!fs.existsSync(logsDir)) return null;
+
+    const screenshots = fs.readdirSync(logsDir)
+      .filter(file => file.endsWith('.png'))
+      .map(file => {
+        const filePath = path.join(logsDir, file);
+        const stats = fs.statSync(filePath);
+        return {
+          filename: file,
+          path: filePath,
+          timestamp: stats.mtime.toISOString()
+        };
+      })
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    return screenshots[0] || null;
+  } catch {
     return null;
   }
 }

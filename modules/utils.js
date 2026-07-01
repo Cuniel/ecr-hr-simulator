@@ -3,6 +3,8 @@ const path = require('path');
 
 class Utils {
   static trace = [];
+  static logsDir = null;
+  static screenshots = [];
 
   static loadConfig() {
     try {
@@ -51,6 +53,7 @@ class Utils {
 
   static resetTrace() {
     Utils.trace = [];
+    Utils.screenshots = [];
   }
 
   static getTrace() {
@@ -85,16 +88,43 @@ class Utils {
     return `${value.slice(0, 3)}****${value.slice(-4)}`;
   }
 
+  static getLogsDir() {
+    if (Utils.logsDir) return Utils.logsDir;
+
+    const candidates = [
+      process.env.LOGS_DIR,
+      path.join(__dirname, '../logs'),
+      '/tmp/ecr-hr-simulator/logs'
+    ].filter(Boolean);
+
+    for (const dir of candidates) {
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+        const probe = path.join(dir, `.write-test-${process.pid}-${Date.now()}`);
+        fs.writeFileSync(probe, 'ok');
+        fs.unlinkSync(probe);
+        Utils.logsDir = dir;
+        return dir;
+      } catch (error) {
+        console.warn(`⚠️ 日志目录不可写，尝试下一个: ${dir} (${error.message})`);
+      }
+    }
+
+    throw new Error('没有可写日志目录');
+  }
+
   static async saveScreenshot(page, filename) {
     try {
-      const logsDir = path.join(__dirname, '../logs');
-      if (!fs.existsSync(logsDir)) {
-        fs.mkdirSync(logsDir, { recursive: true });
-      }
+      const logsDir = Utils.getLogsDir();
       
       const filepath = path.join(logsDir, filename);
       await page.screenshot({ path: filepath, fullPage: true });
-      Utils.log('info', `📸 截图已保存: ${filename}`);
+      Utils.screenshots.push({
+        filename,
+        path: filepath,
+        timestamp: new Date().toISOString()
+      });
+      Utils.log('info', `📸 截图已保存: ${filepath}`);
       return filepath;
     } catch (error) {
       Utils.log('error', '截图保存失败:', error.message);
@@ -109,26 +139,30 @@ class Utils {
   // 新增：创建详细的执行报告
   static async createReport(results, options = {}) {
     try {
-      const reportPath = path.join(__dirname, '../logs', `report-${Utils.getCurrentTimestamp()}.json`);
-      const dryRun = options.dryRun ?? process.argv.includes('--dry-run');
+      const logsDir = Utils.getLogsDir();
+      const reportPath = path.join(logsDir, `report-${Utils.getCurrentTimestamp()}.json`);
+      const testMode = options.dryRun ?? process.argv.includes('--test');
       const headless = options.headless ?? Utils.isHeadless();
       const config = options.config || {};
       const report = {
         timestamp: new Date().toISOString(),
         mode: headless ? 'headless' : 'visible',
-        dryRun,
+        testMode,
+        dryRun: testMode,
         account: {
           username: Utils.maskUsername(config.username),
           passwordProvided: Boolean(config.password),
           passwordLength: config.password ? String(config.password).length : 0
         },
         results: results,
+        screenshots: Utils.screenshots.slice(),
+        latestScreenshot: Utils.screenshots[Utils.screenshots.length - 1] || null,
         trace: Utils.getTrace(),
         success: results.login && results.clockin
       };
       
       fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
-      Utils.log('info', `📄 执行报告已保存: ${path.basename(reportPath)}`);
+      Utils.log('info', `📄 执行报告已保存: ${reportPath}`);
       
       return reportPath;
     } catch (error) {

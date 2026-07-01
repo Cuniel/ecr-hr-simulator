@@ -570,6 +570,46 @@ body {
     margin-bottom: 8px;
 }
 
+.screenshot-preview {
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 253, 248, 0.82);
+}
+
+.screenshot-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink);
+    font-weight: 700;
+}
+
+.screenshot-header small {
+    min-width: 0;
+    max-width: 58%;
+    overflow: hidden;
+    color: var(--muted);
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.screenshot-link {
+    display: block;
+    background: #1b1b1b;
+}
+
+.screenshot-link img {
+    display: block;
+    width: 100%;
+    max-height: 560px;
+    object-fit: contain;
+}
+
 .badge {
     border-radius: 999px;
     font-size: 0.7rem;
@@ -798,6 +838,10 @@ body {
     .metric-card {
         background: #2a2a2a;
         border-color: var(--line);
+    }
+
+    .screenshot-preview {
+        background: #242424;
     }
 }
 

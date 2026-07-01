@@ -29,10 +29,10 @@ class AutoClockInApp {
       Utils.log('info', `👤 登录用户: ${Utils.maskUsername(this.config.username)}`);
       Utils.log('info', `🔑 密码状态: ${this.config.password ? `已提供 (${String(this.config.password).length} 位)` : '未提供'}`);
       
-      // 设置 DRY RUN 模式
+      // 设置测试模式
       if (dryRun) {
         this.config.dryRun = true;
-        Utils.log('info', '🚫 DRY RUN 模式已启用 - 不会实际操作');
+        Utils.log('info', '🚫 测试模式已启用 - 不会实际操作');
       }
 
       // 初始化浏览器
@@ -112,13 +112,13 @@ if (require.main === module) {
   const args = process.argv.slice(2);
   const options = {
     headless: args.includes('--headless'),
-    dryRun: args.includes('--dry-run')
+    dryRun: args.includes('--test')
   };
 
   // 无头模式启动提示
   if (options.headless) {
     console.log('🤖 无头模式启动中...');
-    console.log('📊 执行过程将通过日志输出，截图和报告将保存在 ./logs/ 目录');
+    console.log(`📊 执行过程将通过日志输出，截图和报告将保存在 ${Utils.getLogsDir()} 目录`);
     console.log('⏳ 请耐心等待...\n');
   }
 
@@ -127,7 +127,7 @@ if (require.main === module) {
       if (options.headless) {
         console.log('\n🏁 无头模式执行完成');
         console.log(`📊 最终结果: ${success ? '✅ 成功' : '❌ 失败'}`);
-        console.log('📁 详细日志请查看 ./logs/ 目录');
+        console.log(`📁 详细日志请查看 ${Utils.getLogsDir()} 目录`);
       }
       process.exit(success ? 0 : 1);
     })
