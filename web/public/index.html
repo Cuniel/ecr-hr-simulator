@@ -15,28 +15,22 @@
                 <!-- 时间显示区域 -->
                 <div class="panel time-panel">
                     <div class="time-display">
-                        <div class="time-main">
-                            <span class="time-label">当前时间</span>
-                            <div class="time-value" id="current-time" aria-live="polite">--:--:--</div>
-                        </div>
                         <div class="time-info">
-                            <div class="time-detail">
-                                <i class="fas fa-calendar-alt me-2"></i>
-                                <span id="current-date">--</span>
-                            </div>
-                            <div class="time-detail" id="workday-detail">
-                                <i class="fas fa-briefcase me-2"></i>
-                                <span id="workday-label">判断中...</span>
-                            </div>
+                            <span id="current-date">--</span>
+                            <span class="time-separator">·</span>
+                            <span class="workday-pill" id="workday-detail">
+                                <span class="status-dot" id="system-status"></span>
+                                <span id="workday-label">判断中</span>
+                            </span>
                         </div>
-                        <div class="status-indicator">
-                            <div class="status-dot" id="system-status"></div>
-                            <span class="status-text" id="status-text">正在判断工作日</span>
+                        <div class="time-main">
+                            <div class="time-value" id="current-time" aria-live="polite">--:--</div>
                         </div>
+                        <span class="visually-hidden" id="status-text">正在判断工作日</span>
                     </div>
                 </div>
 
-                <div class="panel">
+                <div class="panel control-panel">
                     <form id="clockin-form" class="test-form">
                         <div class="form-field saved-account-field" id="saved-account-field" hidden>
                             <label for="saved-account">

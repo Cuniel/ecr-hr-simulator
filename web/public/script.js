@@ -341,13 +341,13 @@ class ECRHRApp {
     // 更新时间显示
     updateTime() {
         const now = new Date();
-        const timeString = now.toLocaleTimeString('zh-CN');
-        const dateString = now.toLocaleDateString('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            weekday: 'short'
+        const timeString = now.toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
         });
+        const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+        const dateString = `${now.getMonth() + 1}月${now.getDate()}日 ${weekdays[now.getDay()]}`;
         const timeElement = document.getElementById('current-time');
         if (timeElement) {
             timeElement.textContent = timeString;
@@ -395,7 +395,7 @@ class ECRHRApp {
             detail.classList.toggle('is-restday', !calendar.isWorkday);
             detail.classList.toggle('is-workday', calendar.isWorkday);
         }
-        if (statusText) statusText.textContent = calendar.isWorkday ? '今日适合执行操作' : `今日非工作日：${calendar.name}`;
+        if (statusText) statusText.textContent = calendar.isWorkday ? '今日是工作日' : `今日是休息日${calendar.name ? `：${calendar.name}` : ''}`;
         if (statusDot) statusDot.className = calendar.isWorkday ? 'status-dot' : 'status-dot warning';
     }
 
