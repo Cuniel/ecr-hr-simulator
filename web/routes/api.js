@@ -37,7 +37,7 @@ router.get('/config', (req, res) => {
         locations,
         defaultLocationId: locations.find(location => location.default)?.id || locations[0]?.id || 'custom'
       },
-      timestamp: new Date().toISOString()
+      timestamp: Utils.getCurrentDateTime()
     });
   } catch (error) {
     res.status(500).json({ success: false, message: '读取配置失败: ' + error.message });
@@ -53,7 +53,7 @@ router.get('/calendar/today', (req, res) => {
     res.json({
       success: true,
       data: calendar,
-      timestamp: new Date().toISOString()
+      timestamp: Utils.getCurrentDateTime()
     });
   } catch (error) {
     res.status(400).json({
@@ -68,7 +68,7 @@ router.get('/status', (req, res) => {
   try {
     const stats = {
       status: 'online',
-      timestamp: new Date().toISOString(),
+      timestamp: Utils.getCurrentDateTime(),
       version: require('../../package.json').version,
       uptime: process.uptime(),
       memory: process.memoryUsage(),
@@ -147,7 +147,7 @@ router.post('/test', async (req, res) => {
       success: result,
       message: result ? '测试成功！流程正常' : '测试失败，请检查账号信息',
       data: latestReport,
-      timestamp: new Date().toISOString()
+      timestamp: Utils.getCurrentDateTime()
     });
 
   } catch (error) {
@@ -191,7 +191,7 @@ router.post('/clockin', async (req, res) => {
       success: result,
       message: result ? '🎉 操作成功！' : '❌ 操作失败，请查看详细日志',
       data: latestReport,
-      timestamp: new Date().toISOString()
+      timestamp: Utils.getCurrentDateTime()
     });
 
   } catch (error) {
@@ -265,7 +265,7 @@ function handleLogsRequest(req, res, limit) {
             latestScreenshot: decorated.latestScreenshot,
             screenshotUrl: decorated.screenshotUrl,
             size: stats.size,
-            modified: stats.mtime.toISOString()
+            modified: Utils.formatDateTime(stats.mtime)
           };
         } catch (parseError) {
           // 如果文件解析失败，跳过该文件
@@ -395,7 +395,7 @@ function findLatestScreenshot() {
         return {
           filename: file,
           path: filePath,
-          timestamp: stats.mtime.toISOString()
+          timestamp: Utils.formatDateTime(stats.mtime)
         };
       })
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));

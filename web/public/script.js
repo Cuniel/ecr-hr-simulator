@@ -2,6 +2,7 @@ class ECRHRApp {
     constructor() {
         this.apiBase = '/api';
         this.accountStorageKey = 'ecr-hr-saved-accounts';
+        this.timeZone = 'Asia/Shanghai';
         this.locations = [];
         this.defaultLocation = { id: 'global-harbor', name: '我格广场', latitude: 31.24, longitude: 121.42, default: true };
         this.init();
@@ -65,6 +66,11 @@ class ECRHRApp {
         if (form) {
             form.addEventListener('input', () => this.validateForm());
         }
+
+        window.addEventListener('resize', () => this.normalizeViewport());
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => this.normalizeViewport(), 250);
+        });
         
         this.setupButtonStates();
     }
@@ -141,6 +147,25 @@ class ECRHRApp {
         if (icon) {
             icon.className = `fas ${shouldExpand ? 'fa-chevron-up' : 'fa-chevron-down'}`;
         }
+
+        this.normalizeViewport();
+    }
+
+    normalizeViewport() {
+        requestAnimationFrame(() => {
+            const html = document.documentElement;
+            const body = document.body;
+            html.scrollLeft = 0;
+            body.scrollLeft = 0;
+
+            const scrollHeight = Math.max(html.scrollHeight, body.scrollHeight);
+            const viewportHeight = window.innerHeight || html.clientHeight || 0;
+            const maxScrollTop = Math.max(0, scrollHeight - viewportHeight);
+
+            if (window.scrollY > maxScrollTop) {
+                window.scrollTo({ top: maxScrollTop, left: 0, behavior: 'auto' });
+            }
+        });
     }
 
     async loadAppConfig() {
@@ -258,7 +283,8 @@ class ECRHRApp {
                 
                 resultCard.className = `panel result-panel fade-in ${data.success ? 'result-test' : 'result-failure'}`;
                 resultCard.hidden = false;
-                resultCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                this.normalizeViewport();
             }
         }
         
@@ -342,12 +368,21 @@ class ECRHRApp {
     updateTime() {
         const now = new Date();
         const timeString = now.toLocaleTimeString('zh-CN', {
+            timeZone: this.timeZone,
             hour: '2-digit',
             minute: '2-digit',
             hour12: false
         });
-        const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-        const dateString = `${now.getMonth() + 1}月${now.getDate()}日 ${weekdays[now.getDay()]}`;
+        const dateParts = new Intl.DateTimeFormat('zh-CN', {
+            timeZone: this.timeZone,
+            month: 'numeric',
+            day: 'numeric',
+            weekday: 'short'
+        }).formatToParts(now).reduce((result, part) => {
+            result[part.type] = part.value;
+            return result;
+        }, {});
+        const dateString = `${dateParts.month}月${dateParts.day}日 ${dateParts.weekday}`;
         const timeElement = document.getElementById('current-time');
         if (timeElement) {
             timeElement.textContent = timeString;
@@ -570,7 +605,8 @@ class ECRHRApp {
                 
                 resultCard.className = `panel result-panel fade-in ${success ? 'result-success' : 'result-failure'}`;
                 resultCard.hidden = false;
-                resultCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                this.normalizeViewport();
             }
         }
         
@@ -611,6 +647,7 @@ class ECRHRApp {
             accountSelect.innerHTML = '<option value="">暂无本地记录</option>';
             if (deleteAccountBtn) deleteAccountBtn.disabled = true;
             this.toggleCredentials(true);
+            this.normalizeViewport();
             return;
         }
 
@@ -642,6 +679,7 @@ class ECRHRApp {
 
         if (!selectedUsername) {
             this.toggleCredentials(true);
+            this.normalizeViewport();
             return;
         }
 
@@ -661,6 +699,7 @@ class ECRHRApp {
         }
 
         this.validateForm();
+        this.normalizeViewport();
     }
 
     deleteSelectedAccount() {
@@ -695,7 +734,7 @@ class ECRHRApp {
         accounts.unshift({
             username,
             password,
-            updatedAt: new Date().toISOString()
+            updatedAt: this.getClientTimestamp()
         });
 
         if (!this.saveAccounts(accounts.slice(0, 10))) return;
@@ -706,6 +745,14 @@ class ECRHRApp {
         const value = String(phone);
         if (value.length <= 7) return value;
         return `${value.slice(0, 3)}****${value.slice(-4)}`;
+    }
+
+    getClientTimestamp() {
+        const value = new Date().toLocaleString('sv-SE', {
+            timeZone: this.timeZone,
+            hour12: false
+        });
+        return `${value.replace(' ', 'T')}+08:00`;
     }
 }
 

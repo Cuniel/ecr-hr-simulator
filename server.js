@@ -125,7 +125,7 @@ class WebServer {
     this.app.get(['/health', '/default/health', '/ecr-hr/health', '/default/ecr-hr/health'], (req, res) => {
       res.json({ 
         status: 'healthy', 
-        timestamp: new Date().toISOString(),
+        timestamp: Utils.getCurrentDateTime(),
         version: require('./package.json').version
       });
     });
@@ -146,7 +146,7 @@ class WebServer {
             return {
               name: file,
               size: stats.size,
-              modified: stats.mtime.toISOString()
+              modified: Utils.formatDateTime(stats.mtime)
             };
           })
           .sort((a, b) => new Date(b.modified) - new Date(a.modified));

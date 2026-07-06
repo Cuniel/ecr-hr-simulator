@@ -18,13 +18,19 @@
 }
 
 html {
+    width: 100%;
+    max-width: 100%;
     min-height: 100%;
     overflow-x: hidden;
+    overflow-x: clip;
     overscroll-behavior-y: none;
 }
 
 body {
     margin: 0;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     color: var(--ink);
     font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
     background:
@@ -34,13 +40,22 @@ body {
         var(--page);
     background-size: auto, 42px 42px, 42px 42px;
     overflow-x: hidden;
+    overflow-x: clip;
     overscroll-behavior-y: none;
+    touch-action: pan-y;
+}
+
+[hidden] {
+    display: none !important;
 }
 
 .app-shell {
-    width: min(680px, calc(100% - 32px));
+    width: 100%;
+    max-width: 712px;
     margin: 0 auto;
-    padding: 26px 0 36px;
+    padding: 26px 16px 36px;
+    overflow-x: hidden;
+    overflow-x: clip;
 }
 
 .eyebrow {
@@ -66,14 +81,18 @@ body {
     gap: 14px;
     align-items: start;
     margin-top: 0;
+    min-width: 0;
 }
 
 .main-stack {
     display: grid;
     gap: 14px;
+    min-width: 0;
 }
 
 .panel {
+    min-width: 0;
+    max-width: 100%;
     padding: 20px;
     border: 1px solid rgba(29, 37, 34, 0.1);
     border-radius: 10px;
@@ -224,6 +243,8 @@ body {
 }
 
 .form-control {
+    width: 100%;
+    max-width: 100%;
     min-height: 44px;
     border: 1px solid #cdd6ce;
     border-radius: 8px;
@@ -257,6 +278,7 @@ body {
 }
 
 .credentials-card {
+    min-width: 0;
     border: 1px solid var(--line);
     border-radius: 10px;
     background: rgba(255, 255, 252, 0.56);
@@ -288,6 +310,10 @@ body {
     display: grid;
     gap: 15px;
     padding: 0 13px 15px;
+}
+
+.credentials-body[hidden] {
+    display: none !important;
 }
 
 .credentials-card.is-collapsed .credentials-toggle {
@@ -329,6 +355,7 @@ body {
 }
 
 .btn {
+    max-width: 100%;
     min-height: 42px;
     border-radius: 8px;
     font-weight: 700;
@@ -644,6 +671,7 @@ body {
 
 /* 模态框 */
 .modal-content {
+    max-width: 100%;
     border: none;
     border-radius: 12px;
     box-shadow: 0 20px 50px rgba(0,0,0,0.15);
@@ -739,12 +767,12 @@ body {
 
 @media (max-width: 620px) {
     .app-shell {
-        width: calc(100% - 20px);
-        padding: 16px 0 24px;
+        width: 100%;
+        padding: 14px 10px 20px;
     }
 
     .panel {
-        padding: 20px;
+        padding: 18px;
     }
 
     .section-heading {

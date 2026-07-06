@@ -36,7 +36,7 @@ class AutoClockInApp {
     const { headless = false, dryRun = false } = options;
     
     Utils.resetTrace();
-    this.results.startTime = new Date().toISOString();
+    this.results.startTime = Utils.getCurrentDateTime();
     
     try {
       Utils.log('info', '🚀 启动自动操作应用...');
@@ -97,7 +97,7 @@ class AutoClockInApp {
       this.results.errors.push(error.message);
       return false;
     } finally {
-      this.results.endTime = new Date().toISOString();
+      this.results.endTime = Utils.getCurrentDateTime();
       
       // 生成执行报告（特别适用于无头模式）
       await Utils.createReport(this.results, { dryRun, headless, config: this.config });

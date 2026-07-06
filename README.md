@@ -85,6 +85,17 @@ node -e "const c=require('./modules/chineseCalendar'); console.log(c.getDayType(
 node -e "const c=require('./modules/chineseCalendar'); console.log(c.getDayType('2026-10-10'))"
 ```
 
+## 时区
+
+服务端默认使用东八区：
+
+```text
+TZ=Asia/Shanghai
+APP_TIMEZONE=Asia/Shanghai
+```
+
+Docker 镜像和 Compose 已内置上述环境变量；Lambda 使用容器镜像运行时也会继承。控制台日志、API 时间戳、报告时间、截图元数据都会输出 `+08:00` offset。
+
 ## Docker
 
 构建镜像：
@@ -136,7 +147,7 @@ Lambda 根文件系统只读，因此运行时报告和截图会自动写到：
 
 注意：`/tmp` 是单个 Lambda 实例的临时盘，不适合长期保存。当前接口会在测试/执行响应里直接返回最后截图的 `screenshotDataUrl`，页面展示不依赖后续再次读取 `/tmp` 文件。
 
-Lambda 环境下浏览器会手动启动 Chromium 并通过 CDP 连接，避免 Playwright launch pipe 在 Lambda 里握手卡住。本地运行仍使用持久上下文，便于调试。
+Lambda 环境下使用 Playwright 官方镜像内置 Chromium；本地运行仍使用持久上下文，便于调试。
 
 建议 Lambda 配置：
 
@@ -149,8 +160,8 @@ Lambda 环境下浏览器会手动启动 Chromium 并通过 CDP 连接，避免 
 日志统一格式：
 
 ```text
-2026-07-01T09:16:42.830Z INFO 启动浏览器 (无头模式)...
-2026-07-01T09:16:43.275Z INFO 浏览器初始化完成
+2026-07-01T17:16:42.830+08:00 INFO 启动浏览器 (无头模式)...
+2026-07-01T17:16:43.275+08:00 INFO 浏览器初始化完成
 ```
 
 默认控制台输出 `INFO/WARN/ERROR`。如果需要看更详细调试日志：
@@ -214,7 +225,7 @@ test -x /usr/lib/chromium/chromium
 ls -lah logs
 ```
 
-如果 Lambda 日志出现 `launchPersistentContext`、`browserType.launch` 或 `--single-process`，说明镜像还不是新版代码；重新构建并推送镜像后再更新 Lambda。新版 Lambda 日志应出现“使用 CDP 方式连接浏览器”，Chromium 路径应优先为 `/usr/lib/chromium/chromium`。
+如果 Lambda 日志出现 `launchPersistentContext` 或旧的 Chromium 路径错误，说明镜像还不是新版代码；重新构建并推送镜像后再更新 Lambda。新版 Lambda 日志应出现“使用 Playwright 官方镜像内置完整 Chromium”。
 
 本地 macOS 在某些受限沙箱内启动 Chromium 可能失败；直接在终端运行 `npm run dev` 或 Docker 运行即可。
 

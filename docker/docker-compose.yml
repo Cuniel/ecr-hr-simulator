@@ -8,6 +8,8 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - TZ=Asia/Shanghai
+      - APP_TIMEZONE=Asia/Shanghai
       - ADMIN_KEY=${ADMIN_KEY:-admin123}
       # Playwright 优化
       - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1

@@ -19,7 +19,61 @@ class Utils {
   }
 
   static getCurrentTimestamp() {
-    return new Date().toISOString().replace(/[:.]/g, '-');
+    return Utils.getCurrentDateTime().replace(/[:.]/g, '-');
+  }
+
+  static getTimeZone() {
+    return process.env.APP_TIMEZONE || process.env.TZ || 'Asia/Shanghai';
+  }
+
+  static getCurrentDateTime() {
+    return Utils.formatDateTime(new Date());
+  }
+
+  static formatDateTime(dateInput = new Date(), timeZone = Utils.getTimeZone()) {
+    const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23'
+    });
+    const parts = Object.fromEntries(formatter.formatToParts(date).map(part => [part.type, part.value]));
+    const milliseconds = String(date.getMilliseconds()).padStart(3, '0');
+    const offsetMinutes = Utils.getTimeZoneOffsetMinutes(date, timeZone);
+    const sign = offsetMinutes >= 0 ? '+' : '-';
+    const absoluteOffset = Math.abs(offsetMinutes);
+    const offsetHours = String(Math.floor(absoluteOffset / 60)).padStart(2, '0');
+    const offsetRemainder = String(absoluteOffset % 60).padStart(2, '0');
+
+    return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}.${milliseconds}${sign}${offsetHours}:${offsetRemainder}`;
+  }
+
+  static getTimeZoneOffsetMinutes(date, timeZone) {
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23'
+    });
+    const parts = Object.fromEntries(formatter.formatToParts(date).map(part => [part.type, part.value]));
+    const zonedAsUtc = Date.UTC(
+      Number(parts.year),
+      Number(parts.month) - 1,
+      Number(parts.day),
+      Number(parts.hour),
+      Number(parts.minute),
+      Number(parts.second)
+    );
+    return Math.round((zonedAsUtc - date.getTime()) / 60000);
   }
 
   static async sleep(ms) {
@@ -28,7 +82,7 @@ class Utils {
 
   static log(level, message, ...args) {
     const normalizedLevel = Utils.normalizeLogLevel(level);
-    const timestamp = new Date().toISOString();
+    const timestamp = Utils.getCurrentDateTime();
     const cleanMessage = Utils.cleanLogText(message);
     const cleanArgs = args.map(arg => Utils.serializeTraceArg(arg));
 
@@ -53,7 +107,7 @@ class Utils {
     const normalizedLevel = Utils.normalizeLogLevel(level);
     if (!Utils.shouldPrintLog(normalizedLevel)) return;
 
-    const timestamp = new Date().toISOString();
+    const timestamp = Utils.getCurrentDateTime();
     const label = {
       debug: 'DEBUG',
       info: 'INFO',
@@ -158,7 +212,7 @@ class Utils {
       Utils.screenshots.push({
         filename,
         path: filepath,
-        timestamp: new Date().toISOString()
+        timestamp: Utils.getCurrentDateTime()
       });
       Utils.log('info', `📸 截图已保存: ${filepath}`);
       return filepath;
@@ -181,7 +235,7 @@ class Utils {
       const headless = options.headless ?? Utils.isHeadless();
       const config = options.config || {};
       const report = {
-        timestamp: new Date().toISOString(),
+        timestamp: Utils.getCurrentDateTime(),
         mode: headless ? 'headless' : 'visible',
         testMode,
         dryRun: testMode,
