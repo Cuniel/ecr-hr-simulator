@@ -11,9 +11,10 @@ services:
       - ADMIN_KEY=${ADMIN_KEY:-admin123}
       # Playwright 优化
       - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-      - PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
-      - CHROME_BIN=/usr/bin/chromium-browser
-      - CHROME_PATH=/usr/bin/chromium-browser
+      - ECR_CHROMIUM_EXECUTABLE_PATH=/usr/lib/chromium/chromium
+      - PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/lib/chromium/chromium
+      - CHROME_BIN=/usr/lib/chromium/chromium
+      - CHROME_PATH=/usr/lib/chromium/chromium
       # 内存限制
       - NODE_OPTIONS=--max-old-space-size=2048
     volumes:

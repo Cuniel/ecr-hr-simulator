@@ -17,8 +17,13 @@
     box-sizing: border-box;
 }
 
+html {
+    min-height: 100%;
+    overflow-x: hidden;
+    overscroll-behavior-y: none;
+}
+
 body {
-    min-height: 100vh;
     margin: 0;
     color: var(--ink);
     font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -28,6 +33,8 @@ body {
         linear-gradient(0deg, rgba(39, 95, 85, 0.035) 1px, transparent 1px),
         var(--page);
     background-size: auto, 42px 42px, 42px 42px;
+    overflow-x: hidden;
+    overscroll-behavior-y: none;
 }
 
 .app-shell {

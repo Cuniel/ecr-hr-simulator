@@ -136,6 +136,8 @@ Lambda 根文件系统只读，因此运行时报告和截图会自动写到：
 
 注意：`/tmp` 是单个 Lambda 实例的临时盘，不适合长期保存。当前接口会在测试/执行响应里直接返回最后截图的 `screenshotDataUrl`，页面展示不依赖后续再次读取 `/tmp` 文件。
 
+Lambda 环境下浏览器会手动启动 Chromium 并通过 CDP 连接，避免 Playwright launch pipe 在 Lambda 里握手卡住。本地运行仍使用持久上下文，便于调试。
+
 建议 Lambda 配置：
 
 - 内存：至少 `2048 MB`
@@ -208,12 +210,37 @@ ports:
 
 ```bash
 echo $PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
-which chromium-browser
+test -x /usr/lib/chromium/chromium
 ls -lah logs
 ```
+
+如果 Lambda 日志出现 `launchPersistentContext`、`browserType.launch` 或 `--single-process`，说明镜像还不是新版代码；重新构建并推送镜像后再更新 Lambda。新版 Lambda 日志应出现“使用 CDP 方式连接浏览器”，Chromium 路径应优先为 `/usr/lib/chromium/chromium`。
 
 本地 macOS 在某些受限沙箱内启动 Chromium 可能失败；直接在终端运行 `npm run dev` 或 Docker 运行即可。
 
 ## 重要提醒
 
 测试不会点击真实操作按钮；执行会走真实流程。执行前请确认账号、地点和当天工作日状态。
+
+aws sso login --profile GLB-1033
+## 检索身份验证令牌并向注册表验证 Docker 客户端身份。使用 Amazon Web Services CLI：
+aws ecr get-login-password --region us-east-1 --profile GLB-1033 | docker login --username AWS --password-stdin 103339360083.dkr.ecr.us-east-1.amazonaws.com
+## 使用以下命令生成 Docker 映像。有关从头生成 Docker 文件的信息，请参阅说明 此处 。如果您已生成映像，则可跳过此步骤:
+docker build -f docker/Dockerfile -t ecr-hr .
+## 生成完成后，标记您的映像，以便将映像推送到此存储库:
+docker tag ecr-hr:latest 103339360083.dkr.ecr.us-east-1.amazonaws.com/ecr-hr:latest
+## 运行以下命令将此映像推送到您新创建的 Amazon Web Services 存储库:
+docker push 103339360083.dkr.ecr.us-east-1.amazonaws.com/ecr-hr:latest
+
+## push 成功后，更新 Lambda
+aws lambda update-function-code \
+  --function-name ecr-hr \
+  --image-uri 103339360083.dkr.ecr.us-east-1.amazonaws.com/ecr-hr:latest \
+  --region us-east-1 \
+  --profile GLB-1033
+
+## 建议等待部署完成
+aws lambda wait function-updated \
+  --function-name ecr-hr \
+  --region us-east-1 \
+  --profile GLB-1033

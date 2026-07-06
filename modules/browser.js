@@ -9,26 +9,37 @@ class BrowserManager {
     this.page = null;
     this.config = config;
     this.profileDir = null;
+    this.usesPersistentContext = false;
   }
 
   async init(headless = false, config = this.config) {
     this.config = config;
     const location = this.getLocation();
-    Utils.log('info', `🚀 启动浏览器 (${headless ? '无头模式' : '可见模式'})...`);
-
-    const executablePath = this.getChromiumExecutablePath();
-    if (executablePath) {
-      Utils.log('info', `🌐 使用 Chromium: ${executablePath}`);
-    }
+    const isLambda = this.isLambdaRuntime();
+    const useHeadless = isLambda ? true : headless;
+    Utils.log('info', `🚀 启动浏览器 (${useHeadless ? '无头模式' : '可见模式'})...`);
 
     this.profileDir = this.prepareChromiumRuntime();
-
-    this.context = await chromium.launchPersistentContext(this.profileDir, {
-      headless: headless,
-      slowMo: headless ? 0 : 200,
-      executablePath,
+    const env = {
+      ...process.env,
+      HOME: process.env.HOME || '/tmp',
+      XDG_CACHE_HOME: process.env.XDG_CACHE_HOME || '/tmp/.cache',
+      XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME || '/tmp/.config',
+      XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR || '/tmp/runtime'
+    };
+    if (isLambda) {
+      delete env.DBUS_SESSION_BUS_ADDRESS;
+      delete env.DISPLAY;
+    }
+    const launchOptions = {
+      headless: useHeadless,
+      slowMo: useHeadless ? 0 : 200,
       chromiumSandbox: false,
-      timeout: 60000,
+      timeout: isLambda ? 60000 : 60000,
+      env,
+      args: this.getChromiumArgs()
+    };
+    const contextOptions = {
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1',
       viewport: { width: 375, height: 667 },
       deviceScaleFactor: 2,
@@ -38,18 +49,25 @@ class BrowserManager {
         latitude: location.latitude,
         longitude: location.longitude
       },
-      permissions: ['geolocation'],
-      env: {
-        ...process.env,
-        HOME: process.env.HOME || '/tmp',
-        XDG_CACHE_HOME: process.env.XDG_CACHE_HOME || '/tmp/.cache',
-        XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME || '/tmp/.config',
-        XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR || '/tmp/runtime'
-      },
-      args: this.getChromiumArgs()
-    });
+      permissions: ['geolocation']
+    };
 
-    this.browser = this.context.browser();
+    if (isLambda) {
+      Utils.log('info', '检测到 Lambda 环境，使用 Playwright 官方镜像内置完整 Chromium');
+      this.usesPersistentContext = false;
+      launchOptions.executablePath = this.getLambdaChromiumExecutablePath();
+      Utils.log('info', `Lambda Chromium executablePath: ${launchOptions.executablePath}`);
+      this.browser = await chromium.launch(launchOptions);
+      this.context = await this.browser.newContext(contextOptions);
+    } else {
+      this.usesPersistentContext = true;
+      this.context = await chromium.launchPersistentContext(this.profileDir, {
+        ...launchOptions,
+        ...contextOptions
+      });
+      this.browser = this.context.browser();
+    }
+
     await this.context.setGeolocation({
       latitude: location.latitude,
       longitude: location.longitude
@@ -93,12 +111,18 @@ class BrowserManager {
     if (this.context) {
       await this.context.close();
       this.context = null;
+      if (this.browser && !this.usesPersistentContext) {
+        await this.browser.close();
+      }
       this.browser = null;
+      this.usesPersistentContext = false;
       Utils.log('info', '🔒 浏览器已关闭');
     } else if (this.browser) {
       await this.browser.close();
       this.browser = null;
+      this.usesPersistentContext = false;
       Utils.log('info', '🔒 浏览器已关闭');
+    } else {
     }
   }
 
@@ -106,16 +130,8 @@ class BrowserManager {
     return this.page;
   }
 
-  getChromiumExecutablePath() {
-    const candidates = [
-      process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
-      process.env.CHROME_BIN,
-      process.env.CHROME_PATH,
-      '/usr/bin/chromium-browser',
-      '/usr/bin/chromium'
-    ].filter(Boolean);
-
-    return candidates.find(candidate => fs.existsSync(candidate));
+  isLambdaRuntime() {
+    return Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV);
   }
 
   getLocation() {
@@ -130,8 +146,6 @@ class BrowserManager {
     const profileDir = `/tmp/ecr-hr-simulator/chromium-profile-${process.pid}-${Date.now()}`;
     const dirs = [
       profileDir,
-      '/tmp/ecr-hr-simulator/chromium-cache',
-      '/tmp/ecr-hr-simulator/chromium-data',
       process.env.XDG_CACHE_HOME || '/tmp/.cache',
       process.env.XDG_CONFIG_HOME || '/tmp/.config',
       process.env.XDG_RUNTIME_DIR || '/tmp/runtime'
@@ -149,13 +163,63 @@ class BrowserManager {
     return profileDir;
   }
 
+  getLambdaChromiumExecutablePath() {
+    const candidates = [
+      process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+    ].filter(Boolean);
+
+    try {
+      if (fs.existsSync('/ms-playwright')) {
+        const browserDirs = fs.readdirSync('/ms-playwright')
+          .filter(name => name.startsWith('chromium-'))
+          .sort()
+          .reverse();
+
+        // Lambda 环境优先使用 headless_shell，避免完整 Chrome 尝试连接 DBus 导致启动卡住。
+        for (const browserDir of browserDirs) {
+          candidates.push(`/ms-playwright/${browserDir}/chrome-linux/headless_shell`);
+        }
+
+        for (const browserDir of browserDirs) {
+          candidates.push(`/ms-playwright/${browserDir}/chrome-linux/chrome`);
+        }
+      }
+    } catch (error) {
+      Utils.log('warning', '扫描 /ms-playwright Chromium 目录失败', error.message);
+    }
+
+    candidates.push(
+      '/usr/bin/chromium-browser',
+      '/usr/bin/chromium',
+      '/usr/bin/google-chrome'
+    );
+
+    for (const executablePath of candidates) {
+      try {
+        if (fs.existsSync(executablePath)) {
+          return executablePath;
+        }
+      } catch (error) {
+        Utils.log('warning', `检查 Chromium 可执行文件失败: ${executablePath}`, error.message);
+      }
+    }
+
+    Utils.log('warning', '未找到显式 Chromium 可执行文件，回退到 Playwright 默认查找逻辑');
+    return undefined;
+  }
+
   getChromiumArgs() {
     const args = [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
-      '--disable-software-rasterizer',
+      '--no-zygote',
+      '--single-process',
+      '--disable-crash-reporter',
+      '--disable-crashpad',
+      '--disable-in-process-stack-traces',
+      '--disable-features=VizDisplayCompositor',
       '--disable-background-networking',
       '--disable-background-timer-throttling',
       '--disable-breakpad',
@@ -174,16 +238,10 @@ class BrowserManager {
       '--mute-audio',
       '--no-first-run',
       '--no-default-browser-check',
-      '--no-zygote',
-      '--disable-features=site-per-process,Translate,BackForwardCache,AcceptCHFrame,MediaRouter,OptimizationHints',
-      '--data-path=/tmp/ecr-hr-simulator/chromium-data',
-      '--disk-cache-dir=/tmp/ecr-hr-simulator/chromium-cache'
+      '--disable-software-rasterizer',
+      '--data-path=/tmp/playwright-data',
+      '--disk-cache-dir=/tmp/playwright-cache'
     ];
-
-    if (process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV) {
-      args.push('--single-process');
-      Utils.log('info', '☁️ 检测到 Lambda 环境，启用 Lambda Chromium 参数');
-    }
 
     return args;
   }

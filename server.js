@@ -90,7 +90,13 @@ class WebServer {
       next();
     });
 
-    this.app.use(express.static(path.join(__dirname, 'web/public')));
+    this.app.use(express.static(path.join(__dirname, 'web/public'), {
+      etag: false,
+      lastModified: false,
+      setHeaders: (res) => {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      }
+    }));
 
     // 日志中间件
     this.app.use((req, res, next) => {
@@ -105,11 +111,13 @@ class WebServer {
 
     // 主页面
     this.app.get('/', (req, res) => {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.sendFile(path.join(__dirname, 'web/public/index.html'));
     });
 
     // 兼容 API Gateway 带前缀访问首页
     this.app.get(['/default', '/default/', '/ecr-hr', '/ecr-hr/', '/default/ecr-hr', '/default/ecr-hr/'], (req, res) => {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.sendFile(path.join(__dirname, 'web/public/index.html'));
     });
 
