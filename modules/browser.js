@@ -37,7 +37,7 @@ class BrowserManager {
       chromiumSandbox: false,
       timeout: isLambda ? 60000 : 60000,
       env,
-      args: this.getChromiumArgs()
+      args: this.getChromiumArgs({ isLambda })
     };
     const contextOptions = {
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1',
@@ -53,7 +53,7 @@ class BrowserManager {
     };
 
     if (isLambda) {
-      Utils.log('info', '检测到 Lambda 环境，使用 Playwright 官方镜像内置完整 Chromium');
+      Utils.log('info', '检测到 Lambda 环境，使用 Playwright 官方镜像内置 Chromium');
       this.usesPersistentContext = false;
       launchOptions.executablePath = this.getLambdaChromiumExecutablePath();
       Utils.log('info', `Lambda Chromium executablePath: ${launchOptions.executablePath}`);
@@ -164,29 +164,43 @@ class BrowserManager {
   }
 
   getLambdaChromiumExecutablePath() {
-    const candidates = [
-      process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+    const headlessCandidates = [];
+    const chromeCandidates = [];
+    const explicitCandidates = [
+      process.env.ECR_CHROMIUM_EXECUTABLE_PATH,
+      process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+      process.env.CHROME_BIN,
+      process.env.CHROME_PATH
     ].filter(Boolean);
 
     try {
       if (fs.existsSync('/ms-playwright')) {
-        const browserDirs = fs.readdirSync('/ms-playwright')
-          .filter(name => name.startsWith('chromium-'))
-          .sort()
-          .reverse();
+        const msPlaywrightDirs = fs.readdirSync('/ms-playwright').sort().reverse();
+        const headlessDirs = msPlaywrightDirs.filter(name => name.startsWith('chromium_headless_shell-'));
+        const browserDirs = msPlaywrightDirs.filter(name => name.startsWith('chromium-'));
 
         // Lambda 环境优先使用 headless_shell，避免完整 Chrome 尝试连接 DBus 导致启动卡住。
-        for (const browserDir of browserDirs) {
-          candidates.push(`/ms-playwright/${browserDir}/chrome-linux/headless_shell`);
+        for (const browserDir of headlessDirs) {
+          headlessCandidates.push(`/ms-playwright/${browserDir}/chrome-linux/headless_shell`);
         }
 
         for (const browserDir of browserDirs) {
-          candidates.push(`/ms-playwright/${browserDir}/chrome-linux/chrome`);
+          headlessCandidates.push(`/ms-playwright/${browserDir}/chrome-linux/headless_shell`);
+        }
+
+        for (const browserDir of browserDirs) {
+          chromeCandidates.push(`/ms-playwright/${browserDir}/chrome-linux/chrome`);
         }
       }
     } catch (error) {
       Utils.log('warning', '扫描 /ms-playwright Chromium 目录失败', error.message);
     }
+
+    const candidates = [
+      ...headlessCandidates,
+      ...explicitCandidates,
+      ...chromeCandidates
+    ];
 
     candidates.push(
       '/usr/bin/chromium-browser',
@@ -208,14 +222,13 @@ class BrowserManager {
     return undefined;
   }
 
-  getChromiumArgs() {
+  getChromiumArgs({ isLambda = false } = {}) {
     const args = [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
       '--no-zygote',
-      '--single-process',
       '--disable-crash-reporter',
       '--disable-crashpad',
       '--disable-in-process-stack-traces',
@@ -242,6 +255,10 @@ class BrowserManager {
       '--data-path=/tmp/playwright-data',
       '--disk-cache-dir=/tmp/playwright-cache'
     ];
+
+    if (!isLambda) {
+      args.push('--single-process');
+    }
 
     return args;
   }

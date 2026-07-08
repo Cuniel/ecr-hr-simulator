@@ -208,7 +208,7 @@ class Utils {
       const logsDir = Utils.getLogsDir();
       
       const filepath = path.join(logsDir, filename);
-      await page.screenshot({ path: filepath, fullPage: true });
+      await page.screenshot({ path: filepath, fullPage: false });
       Utils.screenshots.push({
         filename,
         path: filepath,

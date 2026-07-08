@@ -71,6 +71,10 @@ class ECRHRApp {
         window.addEventListener('orientationchange', () => {
             setTimeout(() => this.normalizeViewport(), 250);
         });
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => this.normalizeViewport());
+            window.visualViewport.addEventListener('scroll', () => this.normalizeViewport());
+        }
         
         this.setupButtonStates();
     }
@@ -159,7 +163,7 @@ class ECRHRApp {
             body.scrollLeft = 0;
 
             const scrollHeight = Math.max(html.scrollHeight, body.scrollHeight);
-            const viewportHeight = window.innerHeight || html.clientHeight || 0;
+            const viewportHeight = window.visualViewport?.height || window.innerHeight || html.clientHeight || 0;
             const maxScrollTop = Math.max(0, scrollHeight - viewportHeight);
 
             if (window.scrollY > maxScrollTop) {
@@ -283,11 +287,22 @@ class ECRHRApp {
                 
                 resultCard.className = `panel result-panel fade-in ${data.success ? 'result-test' : 'result-failure'}`;
                 resultCard.hidden = false;
-                resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                this.normalizeViewport();
+                this.stabilizeResultPanel(resultCard);
             }
         }
         
+    }
+
+    stabilizeResultPanel(resultCard) {
+        resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        this.normalizeViewport();
+
+        resultCard.querySelectorAll('img').forEach(image => {
+            image.addEventListener('load', () => this.normalizeViewport(), { once: true });
+        });
+
+        setTimeout(() => this.normalizeViewport(), 120);
+        setTimeout(() => this.normalizeViewport(), 450);
     }
 
     renderScreenshotPreview(report) {
@@ -580,6 +595,7 @@ class ECRHRApp {
                 const timestamp = data.timestamp ? new Date(data.timestamp).toLocaleString('zh-CN') : '刚刚';
                 const loginStatus = data.data?.results?.login ? '✅ 成功' : '❌ 失败';
                 const clockinStatus = data.data?.results?.clockin ? '✅ 成功' : '❌ 失败';
+                const screenshotMarkup = this.renderScreenshotPreview(data.data);
                 
                 resultContent.innerHTML = `
                     <div class="result-meta-grid">
@@ -601,12 +617,12 @@ class ECRHRApp {
                             <i class="fas fa-clock me-1"></i>${timestamp}
                         </small>
                     </div>
+                    ${screenshotMarkup}
                 `;
                 
                 resultCard.className = `panel result-panel fade-in ${success ? 'result-success' : 'result-failure'}`;
                 resultCard.hidden = false;
-                resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                this.normalizeViewport();
+                this.stabilizeResultPanel(resultCard);
             }
         }
         

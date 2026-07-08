@@ -322,14 +322,17 @@ class ClockIn {
       
       if (result.success) {
         Utils.log('success', `✅ 操作成功！时间: ${result.time || '未知'}`);
+        await this.saveFinalScreenshot('clockin-result');
         return true;
       } else {
         // 即使检测不到明确的成功标识，如果有网络请求且页面状态改变了，也认为可能成功
         if (stateChanged.changed) {
           Utils.log('info', '📊 基于页面变化判断，操作可能已成功');
+          await this.saveFinalScreenshot('clockin-result');
           return true;
         } else {
           Utils.log('warning', `⚠️  操作结果不确定: ${result.message || '未知'}`);
+          await this.saveFinalScreenshot('clockin-uncertain');
           return false;
         }
       }
@@ -338,6 +341,18 @@ class ClockIn {
       Utils.log('error', `执行操作失败: ${error.message}`);
       await Utils.saveScreenshot(this.page, `clockin-failed-${Utils.getCurrentTimestamp()}.png`);
       return false;
+    }
+  }
+
+  async saveFinalScreenshot(prefix) {
+    try {
+      await this.page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
+      await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      await Utils.sleep(800);
+      Utils.log('info', `📸 保存最终页面截图: ${prefix}`);
+      await Utils.saveScreenshot(this.page, `${prefix}-${Utils.getCurrentTimestamp()}.png`);
+    } catch (error) {
+      Utils.log('warning', '最终页面截图保存失败:', error.message);
     }
   }
 

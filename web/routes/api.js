@@ -124,43 +124,26 @@ router.post('/validate', async (req, res) => {
 
 // 测试操作
 router.post('/test', async (req, res) => {
-  try {
-    const { username, password, location } = req.body;
-    
-    if (!username || !password) {
-      return res.status(400).json({
-        success: false,
-        message: '用户名和密码不能为空'
-      });
-    }
-
-    // 执行测试
-    const app = new AutoClockInApp();
-    app.config = buildRunConfig({ username, password, location, dryRun: true });
-    
-    const result = await app.run({ headless: true, dryRun: true });
-
-    // 获取最新的执行报告
-    const latestReport = getLatestReport();
-
-    res.json({
-      success: result,
-      message: result ? '测试成功！流程正常' : '测试失败，请检查账号信息',
-      data: latestReport,
-      timestamp: Utils.getCurrentDateTime()
-    });
-
-  } catch (error) {
-    Utils.writeConsole('error', '测试操作错误', error);
-    res.status(500).json({
-      success: false,
-      message: '测试过程发生错误: ' + error.message
-    });
-  }
+  return runWorkflow(req, res, {
+    dryRun: true,
+    successMessage: '测试成功！流程正常',
+    failureMessage: '测试失败，请检查账号信息',
+    errorPrefix: '测试过程发生错误'
+  });
 });
 
 // 执行真实操作
 router.post('/clockin', async (req, res) => {
+  return runWorkflow(req, res, {
+    dryRun: false,
+    requireConfirm: true,
+    successMessage: '🎉 操作成功！',
+    failureMessage: '❌ 操作失败，请查看详细日志',
+    errorPrefix: '操作过程发生错误'
+  });
+});
+
+async function runWorkflow(req, res, options) {
   try {
     const { username, password, location, confirm } = req.body;
     
@@ -171,37 +154,34 @@ router.post('/clockin', async (req, res) => {
       });
     }
 
-    if (!confirm) {
+    if (options.requireConfirm && !confirm) {
       return res.status(400).json({
         success: false,
-        message: '请确认执行真实操作操作'
+        message: '请确认执行真实操作'
       });
     }
 
-    // 执行真实操作
     const app = new AutoClockInApp();
-    app.config = buildRunConfig({ username, password, location, dryRun: false });
+    app.config = buildRunConfig({ username, password, location, dryRun: options.dryRun });
     
-    const result = await app.run({ headless: true, dryRun: false });
-
-    // 获取最新的执行报告
+    const result = await app.run({ headless: true, dryRun: options.dryRun });
     const latestReport = getLatestReport();
 
     res.json({
       success: result,
-      message: result ? '🎉 操作成功！' : '❌ 操作失败，请查看详细日志',
+      message: result ? options.successMessage : options.failureMessage,
       data: latestReport,
       timestamp: Utils.getCurrentDateTime()
     });
 
   } catch (error) {
-    Utils.writeConsole('error', '执行操作错误', error);
+    Utils.writeConsole('error', options.dryRun ? '测试操作错误' : '执行操作错误', error);
     res.status(500).json({
       success: false,
-      message: '操作过程发生错误: ' + error.message
+      message: `${options.errorPrefix}: ${error.message}`
     });
   }
-});
+}
 
 // 查看执行截图
 router.get('/screenshots/:filename', (req, res) => {

@@ -24,6 +24,7 @@ html {
     overflow-x: hidden;
     overflow-x: clip;
     overscroll-behavior-y: none;
+    -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -42,7 +43,7 @@ body {
     overflow-x: hidden;
     overflow-x: clip;
     overscroll-behavior-y: none;
-    touch-action: pan-y;
+    min-height: 100svh;
 }
 
 [hidden] {
@@ -51,7 +52,7 @@ body {
 
 .app-shell {
     width: 100%;
-    max-width: 712px;
+    max-width: min(712px, 100%);
     margin: 0 auto;
     padding: 26px 16px 36px;
     overflow-x: hidden;
@@ -82,12 +83,14 @@ body {
     align-items: start;
     margin-top: 0;
     min-width: 0;
+    max-width: 100%;
 }
 
 .main-stack {
     display: grid;
     gap: 14px;
     min-width: 0;
+    max-width: 100%;
 }
 
 .panel {
@@ -233,6 +236,13 @@ body {
 .test-form {
     display: grid;
     gap: 16px;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.form-field {
+    min-width: 0;
+    max-width: 100%;
 }
 
 .form-field label {
@@ -271,6 +281,7 @@ body {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 10px;
     align-items: center;
+    max-width: 100%;
 }
 
 .account-manager .btn {
@@ -336,7 +347,14 @@ body {
 }
 
 .input-group .form-control {
+    min-width: 0;
     border-radius: 8px 0 0 8px;
+}
+
+.input-group {
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: nowrap;
 }
 
 .input-group .btn {
@@ -395,6 +413,8 @@ body {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .action-row .btn-lg {
@@ -643,14 +663,18 @@ body {
 
 .screenshot-link {
     display: block;
-    background: #1b1b1b;
+    background: #f7f9f5;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .screenshot-link img {
     display: block;
     width: 100%;
-    max-height: 560px;
+    height: auto;
+    max-height: none;
     object-fit: contain;
+    object-position: center top;
 }
 
 .badge {
@@ -763,16 +787,29 @@ body {
     .action-row .btn-lg {
         width: 100%;
     }
+
+    input,
+    select,
+    textarea,
+    button,
+    .form-control,
+    .btn {
+        font-size: 16px;
+    }
 }
 
 @media (max-width: 620px) {
     .app-shell {
         width: 100%;
-        padding: 14px 10px 20px;
+        padding: 12px max(8px, env(safe-area-inset-right)) 18px max(8px, env(safe-area-inset-left));
     }
 
     .panel {
-        padding: 18px;
+        padding: 16px;
+    }
+
+    .control-panel {
+        padding: 16px;
     }
 
     .section-heading {
@@ -799,6 +836,11 @@ body {
     .coordinate-grid,
     .account-manager {
         grid-template-columns: 1fr;
+    }
+
+    .account-manager .btn {
+        width: 100%;
+        min-width: 0;
     }
 
     .result-meta-grid {
@@ -832,6 +874,10 @@ body {
 
     .modal-body {
         padding: 20px;
+    }
+
+    .screenshot-link {
+        max-height: none;
     }
 }
 
