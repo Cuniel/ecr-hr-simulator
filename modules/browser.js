@@ -1,5 +1,7 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
+const http = require('http');
+const { spawn } = require('child_process');
 const Utils = require('./utils');
 
 class BrowserManager {
@@ -10,6 +12,7 @@ class BrowserManager {
     this.config = config;
     this.profileDir = null;
     this.usesPersistentContext = false;
+    this.chromiumProcess = null;
   }
 
   async init(headless = false, config = this.config) {
@@ -53,11 +56,11 @@ class BrowserManager {
     };
 
     if (isLambda) {
-      Utils.log('info', '检测到 Lambda 环境，使用 Playwright 官方镜像内置 Chromium');
+      Utils.log('info', '检测到 Lambda 环境，使用 CDP 方式连接 Chromium');
       this.usesPersistentContext = false;
       launchOptions.executablePath = this.getLambdaChromiumExecutablePath();
       Utils.log('info', `Lambda Chromium executablePath: ${launchOptions.executablePath}`);
-      this.browser = await chromium.launch(launchOptions);
+      this.browser = await this.launchChromiumOverCDP(launchOptions);
       this.context = await this.browser.newContext(contextOptions);
     } else {
       this.usesPersistentContext = true;
@@ -116,13 +119,16 @@ class BrowserManager {
       }
       this.browser = null;
       this.usesPersistentContext = false;
+      this.closeChromiumProcess();
       Utils.log('info', '🔒 浏览器已关闭');
     } else if (this.browser) {
       await this.browser.close();
       this.browser = null;
       this.usesPersistentContext = false;
+      this.closeChromiumProcess();
       Utils.log('info', '🔒 浏览器已关闭');
     } else {
+      this.closeChromiumProcess();
     }
   }
 
@@ -220,6 +226,91 @@ class BrowserManager {
 
     Utils.log('warning', '未找到显式 Chromium 可执行文件，回退到 Playwright 默认查找逻辑');
     return undefined;
+  }
+
+  async launchChromiumOverCDP(launchOptions) {
+    const executablePath = launchOptions.executablePath;
+    if (!executablePath) {
+      throw new Error('未找到 Lambda Chromium 可执行文件');
+    }
+
+    const port = Number(process.env.CHROMIUM_REMOTE_DEBUGGING_PORT) || (9222 + (process.pid % 300));
+    const endpoint = `http://127.0.0.1:${port}`;
+    const args = [
+      ...launchOptions.args,
+      '--headless',
+      '--remote-debugging-address=127.0.0.1',
+      `--remote-debugging-port=${port}`,
+      `--user-data-dir=${this.profileDir}`,
+      'about:blank'
+    ];
+
+    Utils.log('info', `Lambda CDP 启动 Chromium: 127.0.0.1:${port}`);
+    this.chromiumProcess = spawn(executablePath, args, {
+      env: launchOptions.env,
+      stdio: ['ignore', 'ignore', 'pipe']
+    });
+
+    let stderrBuffer = '';
+    this.chromiumProcess.stderr.on('data', chunk => {
+      const text = chunk.toString();
+      stderrBuffer = (stderrBuffer + text).slice(-4000);
+      if (process.env.DEBUG_BROWSER_CONSOLE === '1') {
+        Utils.log('debug', `Chromium stderr: ${text.trim()}`);
+      }
+    });
+
+    this.chromiumProcess.on('exit', (code, signal) => {
+      if (this.chromiumProcess) {
+        Utils.log('warning', `Chromium 进程已退出: code=${code} signal=${signal}`, stderrBuffer.trim());
+      }
+    });
+
+    await this.waitForCDP(endpoint, launchOptions.timeout || 60000, () => stderrBuffer);
+    return chromium.connectOverCDP(endpoint, { timeout: launchOptions.timeout || 60000 });
+  }
+
+  async waitForCDP(endpoint, timeout, getStderr) {
+    const startedAt = Date.now();
+    const url = `${endpoint}/json/version`;
+
+    while (Date.now() - startedAt < timeout) {
+      if (this.chromiumProcess?.exitCode !== null) {
+        throw new Error(`Chromium 启动失败，进程已退出: ${getStderr() || '无 stderr'}`);
+      }
+
+      if (await this.canReach(url)) {
+        return;
+      }
+
+      await Utils.sleep(250);
+    }
+
+    throw new Error(`等待 Chromium CDP 端口超时: ${endpoint}. ${getStderr() || ''}`.trim());
+  }
+
+  canReach(url) {
+    return new Promise(resolve => {
+      const req = http.get(url, res => {
+        res.resume();
+        resolve(res.statusCode >= 200 && res.statusCode < 500);
+      });
+      req.setTimeout(1000, () => {
+        req.destroy();
+        resolve(false);
+      });
+      req.on('error', () => resolve(false));
+    });
+  }
+
+  closeChromiumProcess() {
+    if (!this.chromiumProcess) return;
+
+    const processRef = this.chromiumProcess;
+    this.chromiumProcess = null;
+    if (processRef.exitCode === null) {
+      processRef.kill('SIGTERM');
+    }
   }
 
   getChromiumArgs({ isLambda = false } = {}) {

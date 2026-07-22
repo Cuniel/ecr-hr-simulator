@@ -181,10 +181,12 @@ class Utils {
   static getLogsDir() {
     if (Utils.logsDir) return Utils.logsDir;
 
+    const defaultLogsDir = path.join(__dirname, '../logs');
+    const lambdaLogsDir = '/tmp/ecr-hr-simulator/logs';
+    const isLambda = Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV);
     const candidates = [
       process.env.LOGS_DIR,
-      path.join(__dirname, '../logs'),
-      '/tmp/ecr-hr-simulator/logs'
+      ...(isLambda ? [lambdaLogsDir, defaultLogsDir] : [defaultLogsDir, lambdaLogsDir])
     ].filter(Boolean);
 
     for (const dir of candidates) {

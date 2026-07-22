@@ -1,5 +1,4 @@
 const express = require('express');
-const AutoClockInApp = require('../../main');
 const ChineseCalendar = require('../../modules/chineseCalendar');
 const Utils = require('../../modules/utils');
 const fs = require('fs');
@@ -161,6 +160,7 @@ async function runWorkflow(req, res, options) {
       });
     }
 
+    const AutoClockInApp = require('../../main');
     const app = new AutoClockInApp();
     app.config = buildRunConfig({ username, password, location, dryRun: options.dryRun });
     
@@ -337,9 +337,13 @@ function decorateReport(report, options = {}) {
   const screenshotDataUrl = options.includeScreenshotData && filename
     ? readScreenshotDataUrl(filename)
     : null;
+  const screenshots = normalizeReportScreenshots(report.screenshots, {
+    includeScreenshotData: options.includeScreenshotData
+  });
 
   return {
     ...report,
+    screenshots,
     latestScreenshot: latestScreenshot
       ? {
           ...latestScreenshot,
@@ -349,6 +353,24 @@ function decorateReport(report, options = {}) {
     screenshotUrl: filename ? `/api/screenshots/${encodeURIComponent(filename)}` : null,
     screenshotDataUrl
   };
+}
+
+function normalizeReportScreenshots(screenshots = [], options = {}) {
+  if (!Array.isArray(screenshots)) return [];
+
+  return screenshots
+    .map(screenshot => {
+      const filename = screenshot?.filename ? path.basename(screenshot.filename) : null;
+      if (!filename || !/\.png$/i.test(filename)) return null;
+
+      return {
+        ...screenshot,
+        filename,
+        screenshotUrl: `/api/screenshots/${encodeURIComponent(filename)}`,
+        screenshotDataUrl: options.includeScreenshotData ? readScreenshotDataUrl(filename) : null
+      };
+    })
+    .filter(Boolean);
 }
 
 function readScreenshotDataUrl(filename) {

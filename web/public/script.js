@@ -260,7 +260,7 @@ class ECRHRApp {
                 const timestamp = data.timestamp ? new Date(data.timestamp).toLocaleString('zh-CN') : '刚刚';
                 const loginStatus = data.data?.results?.login ? '✅ 成功' : '❌ 失败';
                 const clockinStatus = data.data?.results?.clockin ? '✅ 成功' : '❌ 失败';
-                const screenshotMarkup = this.renderScreenshotPreview(data.data);
+                const screenshotMarkup = this.renderScreenshotTimeline(data.data);
                 
                 resultContent.innerHTML = `
                     <div class="result-meta-grid">
@@ -305,26 +305,68 @@ class ECRHRApp {
         setTimeout(() => this.normalizeViewport(), 450);
     }
 
-    renderScreenshotPreview(report) {
-        const screenshotUrl = report?.screenshotDataUrl || report?.screenshotUrl;
-        if (!screenshotUrl) return '';
+    renderScreenshotTimeline(report) {
+        const screenshots = Array.isArray(report?.screenshots) && report.screenshots.length > 0
+            ? report.screenshots
+            : this.getFallbackScreenshots(report);
 
-        const filename = report?.latestScreenshot?.filename || '最后截图';
-        const safeUrl = this.escapeHtml(screenshotUrl);
-        const safeFilename = this.escapeHtml(filename);
-        const openUrl = report?.screenshotUrl || screenshotUrl;
-        const safeOpenUrl = this.escapeHtml(openUrl);
+        if (screenshots.length === 0) return '';
+
+        const items = screenshots.map((screenshot, index) => this.renderScreenshotItem(screenshot, index)).join('');
 
         return `
             <div class="screenshot-preview mt-3">
                 <div class="screenshot-header">
-                    <span><i class="fas fa-image me-2"></i>最后截图</span>
-                    <small>${safeFilename}</small>
+                    <span><i class="fas fa-images me-2"></i>执行截图</span>
+                    <small>${screenshots.length} 张</small>
+                </div>
+                <div class="screenshot-list">
+                    ${items}
+                </div>
+            </div>
+        `;
+    }
+
+    getFallbackScreenshots(report) {
+        const screenshotUrl = report?.screenshotDataUrl || report?.screenshotUrl;
+        if (!screenshotUrl) return [];
+
+        const filename = report?.latestScreenshot?.filename || '最后截图';
+        return [{
+            filename,
+            screenshotUrl: report?.screenshotUrl || screenshotUrl,
+            screenshotDataUrl: screenshotUrl,
+            timestamp: report?.latestScreenshot?.timestamp
+        }];
+    }
+
+    renderScreenshotItem(screenshot, index) {
+        const screenshotUrl = screenshot?.screenshotDataUrl || screenshot?.screenshotUrl;
+        if (!screenshotUrl) return '';
+
+        const filename = screenshot?.filename || `截图 ${index + 1}`;
+        const safeUrl = this.escapeHtml(screenshotUrl);
+        const safeFilename = this.escapeHtml(filename);
+        const openUrl = screenshot?.screenshotUrl || screenshotUrl;
+        const safeOpenUrl = this.escapeHtml(openUrl);
+        const timestamp = screenshot?.timestamp ? new Date(screenshot.timestamp).toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        }) : '';
+        const safeTimestamp = this.escapeHtml(timestamp);
+
+        return `
+            <article class="screenshot-item">
+                <div class="screenshot-item-header">
+                    <span>${index + 1}. ${safeFilename}</span>
+                    ${safeTimestamp ? `<small>${safeTimestamp}</small>` : ''}
                 </div>
                 <a href="${safeOpenUrl}" target="_blank" rel="noopener" class="screenshot-link">
-                    <img src="${safeUrl}" alt="最后截图：${safeFilename}" loading="lazy">
+                    <img src="${safeUrl}" alt="执行截图：${safeFilename}" loading="lazy">
                 </a>
-            </div>
+            </article>
         `;
     }
 
@@ -595,7 +637,7 @@ class ECRHRApp {
                 const timestamp = data.timestamp ? new Date(data.timestamp).toLocaleString('zh-CN') : '刚刚';
                 const loginStatus = data.data?.results?.login ? '✅ 成功' : '❌ 失败';
                 const clockinStatus = data.data?.results?.clockin ? '✅ 成功' : '❌ 失败';
-                const screenshotMarkup = this.renderScreenshotPreview(data.data);
+                const screenshotMarkup = this.renderScreenshotTimeline(data.data);
                 
                 resultContent.innerHTML = `
                     <div class="result-meta-grid">

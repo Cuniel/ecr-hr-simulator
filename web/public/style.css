@@ -661,6 +661,45 @@ body {
     white-space: nowrap;
 }
 
+.screenshot-list {
+    display: grid;
+    gap: 12px;
+    padding: 12px;
+}
+
+.screenshot-item {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid rgba(216, 222, 213, 0.9);
+    border-radius: 8px;
+    background: rgba(255, 255, 252, 0.76);
+}
+
+.screenshot-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink);
+    font-size: 0.82rem;
+    font-weight: 750;
+}
+
+.screenshot-item-header span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.screenshot-item-header small {
+    flex: 0 0 auto;
+    color: var(--muted);
+    font-weight: 600;
+}
+
 .screenshot-link {
     display: block;
     background: #f7f9f5;
